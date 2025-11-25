@@ -6,21 +6,20 @@ A web-first puzzle game based on the Post Correspondence Problem (PCP). Build a 
 - Generate a PCP instance (via seed or at random). Each tile has a top string and a bottom string; lengths can differ per tile but the overall top and bottom concatenations are balanced.
 - Drag tiles into the solution slots to build an ordered stack. You must use every tile exactly once; the tray keeps a reference copy so you can reorder freely.
 - Objective: the concatenation of all top strings in order must exactly equal the concatenation of all bottom strings in the same order.
-- Validate at any time; if matched, you win. If stuck, hit **Show solution** to auto-place the correct stack and end the round (or reveal unsolvable in Extreme).
+- Validate at any time; if matched, you win. If stuck, hit **Show solution** to auto-place the correct stack and end the round.
 - Track elapsed time and move count per run; keep a local leaderboard/history.
 
 ## Difficulty & Presets
-Presets set defaults that the user can still tweak. Extreme is the only mode that may be unsolvable.
+Presets set defaults that the user can still tweak.
 
-- **Easy**: 4-6 tiles, alphabet size 2, string length 2-3, guaranteed solvable, short solution path.
-- **Medium**: 5-7 tiles, alphabet size 2-3, string length 2-4, guaranteed solvable, moderate solution length.
-- **Hard**: 7-9 tiles, alphabet size 3, string length 3-5, guaranteed solvable, longer/near-unique solution.
-- **Extreme**: 8-10 tiles, alphabet size 3-4, string length 3-6, may be unsolvable. User can declare "unsolvable" or keep searching; show-solution reveals if solvable.
+- **Easy**: 3 tiles, alphabet size 2, string length 2-3, guaranteed solvable, short solution path.
+- **Medium**: 5 tiles, alphabet size 2-3, string length 2-4, guaranteed solvable, moderate solution length.
+- **Hard**: 7 tiles, alphabet size 3, string length 3-5, guaranteed solvable, longer/near-unique solution.
 
 ## Configurable Settings
 - Number of tiles, alphabet size, min/max string length, and solution length limits.
 - Seed input (optional). If blank, a random seed is generated; the seed drives the generator for reproducible puzzles.
-- Mode toggles: allow repeated tiles, allow unsolvable instances (Extreme only), enforce unique solution.
+- Mode toggles: allow repeated tiles, enforce unique solution.
 - UI: enable live mismatch highlighting, auto-validate on each drop, and confirm-before-reset.
 
 ## Repeatability & Sharing
@@ -36,7 +35,6 @@ Presets set defaults that the user can still tweak. Extreme is the only mode tha
 
 ## Show Solution Behavior
 - Button instantly places the correct tile order (if solvable) and ends the game.
-- In Extreme mode with an unsolvable instance, it reveals that no solution exists.
 - After reveal, disable further moves but allow replay with the same or new seed.
 
 ## Architecture Plan

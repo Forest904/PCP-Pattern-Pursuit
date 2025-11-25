@@ -1,8 +1,7 @@
 export const PRESETS = {
-    easy: { tileCount: 5, alphabet: ["a", "b"], minLength: 2, maxLength: 3, allowUnsolvable: false },
-    medium: { tileCount: 6, alphabet: ["a", "b", "c"], minLength: 2, maxLength: 4, allowUnsolvable: false },
-    hard: { tileCount: 8, alphabet: ["a", "b", "c"], minLength: 3, maxLength: 5, allowUnsolvable: false },
-    extreme: { tileCount: 9, alphabet: ["a", "b", "c", "d"], minLength: 3, maxLength: 6, allowUnsolvable: true },
+    easy: { tileCount: 3, alphabet: ["a", "b"], minLength: 2, maxLength: 3, allowUnsolvable: false },
+    medium: { tileCount: 5, alphabet: ["a", "b", "c"], minLength: 2, maxLength: 4, allowUnsolvable: false },
+    hard: { tileCount: 7, alphabet: ["a", "b", "c"], minLength: 3, maxLength: 5, allowUnsolvable: false },
 };
 const DEFAULT_TARGET_LENGTH = 7;
 const mulberry32 = (seed) => {
@@ -74,53 +73,70 @@ const randomPartition = (rng, total, count, minLen, maxLen) => {
     return null;
 };
 const buildSolvableTiles = (rng, settings) => {
-    const tiles = [];
-    const solution = [];
     const minLen = Math.max(1, settings.minLength);
     const maxLen = Math.max(minLen, settings.maxLength);
     const minTotal = settings.tileCount * minLen;
     const maxTotal = settings.tileCount * maxLen;
-    let topParts = null;
-    let bottomParts = null;
-    let totalLength = 0;
-    let tries = 0;
-    while (tries < 50 && (!topParts || !bottomParts)) {
-        totalLength = Math.min(maxTotal, Math.max(minTotal, DEFAULT_TARGET_LENGTH + Math.floor(rng() * (maxTotal - minTotal + 1))));
-        topParts = randomPartition(rng, totalLength, settings.tileCount, minLen, maxLen);
-        bottomParts = randomPartition(rng, totalLength, settings.tileCount, minLen, maxLen);
-        if (topParts && bottomParts) {
-            const hasDiff = topParts.some((len, idx) => len !== bottomParts[idx]);
-            if (!hasDiff) {
-                topParts = null;
-                bottomParts = null;
+    let attempts = 0;
+    while (attempts < 100) {
+        let topParts = null;
+        let bottomParts = null;
+        let totalLength = 0;
+        let tries = 0;
+        while (tries < 50 && (!topParts || !bottomParts)) {
+            totalLength = Math.min(maxTotal, Math.max(minTotal, DEFAULT_TARGET_LENGTH + Math.floor(rng() * (maxTotal - minTotal + 1))));
+            topParts = randomPartition(rng, totalLength, settings.tileCount, minLen, maxLen);
+            bottomParts = randomPartition(rng, totalLength, settings.tileCount, minLen, maxLen);
+            if (topParts && bottomParts) {
+                const hasDiff = topParts.some((len, idx) => len !== bottomParts[idx]);
+                if (!hasDiff) {
+                    topParts = null;
+                    bottomParts = null;
+                }
+            }
+            tries++;
+        }
+        if (!topParts || !bottomParts) {
+            const base = Array.from({ length: settings.tileCount }, () => minLen);
+            base[0] = minLen;
+            base[1] = Math.min(maxLen, minLen + 1);
+            topParts = [...base];
+            bottomParts = [...base].reverse();
+            totalLength = base.reduce((sum, v) => sum + v, 0);
+        }
+        for (let targetAttempt = 0; targetAttempt < 60; targetAttempt++) {
+            const target = randomString(rng, settings.alphabet, totalLength);
+            const tiles = [];
+            const solution = [];
+            const seen = new Set();
+            let topOffset = 0;
+            let bottomOffset = 0;
+            let duplicate = false;
+            for (let i = 0; i < settings.tileCount; i++) {
+                const topLen = topParts[i];
+                const bottomLen = bottomParts[i];
+                const topSlice = target.slice(topOffset, topOffset + topLen);
+                const bottomSlice = target.slice(bottomOffset, bottomOffset + bottomLen);
+                const key = `${topSlice}|${bottomSlice}`;
+                if (seen.has(key)) {
+                    duplicate = true;
+                    break;
+                }
+                const id = makeId(rng, i);
+                tiles.push({ id, top: topSlice, bottom: bottomSlice });
+                solution.push(id);
+                seen.add(key);
+                topOffset += topLen;
+                bottomOffset += bottomLen;
+            }
+            if (!duplicate) {
+                const shuffledTiles = shuffle(rng, tiles);
+                return { tiles: shuffledTiles, solution };
             }
         }
-        tries++;
+        attempts++;
     }
-    if (!topParts || !bottomParts) {
-        const base = Array.from({ length: settings.tileCount }, () => minLen);
-        base[0] = minLen;
-        base[1] = Math.min(maxLen, minLen + 1);
-        topParts = [...base];
-        bottomParts = [...base].reverse();
-        totalLength = base.reduce((sum, v) => sum + v, 0);
-    }
-    const target = randomString(rng, settings.alphabet, totalLength);
-    let topOffset = 0;
-    let bottomOffset = 0;
-    for (let i = 0; i < settings.tileCount; i++) {
-        const topLen = topParts[i];
-        const bottomLen = bottomParts[i];
-        const topSlice = target.slice(topOffset, topOffset + topLen);
-        const bottomSlice = target.slice(bottomOffset, bottomOffset + bottomLen);
-        const id = makeId(rng, i);
-        tiles.push({ id, top: topSlice, bottom: bottomSlice });
-        solution.push(id);
-        topOffset += topLen;
-        bottomOffset += bottomLen;
-    }
-    const shuffledTiles = shuffle(rng, tiles);
-    return { tiles: shuffledTiles, solution };
+    throw new Error("Failed to generate a unique solvable tile set.");
 };
 export const generatePuzzle = ({ preset, seed }) => {
     const settings = PRESETS[preset];
@@ -128,12 +144,22 @@ export const generatePuzzle = ({ preset, seed }) => {
     const rng = mulberry32(hashSeed(actualSeed));
     const shouldBeUnsolvable = settings.allowUnsolvable && rng() > 0.6;
     if (shouldBeUnsolvable) {
+        const seen = new Set();
         const tiles = Array.from({ length: settings.tileCount }).map((_, idx) => {
-            const top = randomString(rng, settings.alphabet, settings.minLength);
-            let bottom = randomString(rng, settings.alphabet, settings.maxLength);
-            if (bottom === top) {
-                bottom = `${bottom}${settings.alphabet[Math.floor(rng() * settings.alphabet.length)]}`;
-            }
+            let top = "";
+            let bottom = "";
+            let key = "";
+            let guard = 0;
+            do {
+                top = randomString(rng, settings.alphabet, settings.minLength);
+                bottom = randomString(rng, settings.alphabet, settings.maxLength);
+                if (bottom === top) {
+                    bottom = `${bottom}${settings.alphabet[Math.floor(rng() * settings.alphabet.length)]}`;
+                }
+                key = `${top}|${bottom}`;
+                guard++;
+            } while (seen.has(key) && guard < 50);
+            seen.add(key);
             return { id: makeId(rng, idx), top, bottom };
         });
         return { seed: actualSeed, preset, settings, tiles, solvable: false };

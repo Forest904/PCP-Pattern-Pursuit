@@ -21,7 +21,6 @@ const presetLabels: Record<PresetName, string> = {
   easy: "Easy",
   medium: "Medium",
   hard: "Hard",
-  extreme: "Extreme",
 };
 
 function App() {
@@ -281,7 +280,7 @@ function App() {
             <li>Use every tile exactly once to complete the Turing tape.</li>
             <li>Order matters: concatenate all top strings in order and all bottom strings in the same order.</li>
             <li>You win when the full top string equals the full bottom string.</li>
-            <li>Validate anytime, or press Show to auto-place the solution (or reveal unsolvable in Extreme).</li>
+            <li>Validate anytime, or press Show to auto-place the solution.</li>
           </ul>
         </section>
       ) : (
