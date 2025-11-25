@@ -34,19 +34,16 @@ function App() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [drag, setDrag] = useState<DragState>({ draggingId: null });
-  const [message, setMessage] = useState<string>("");
+  const [message, setMessage] = useState<string>("Generate a puzzle to begin.");
   const [showPanel, setShowPanel] = useState(true);
+  const [showBrief, setShowBrief] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (status !== "playing" || startTime === null) return;
     const id = setInterval(() => setElapsed(Date.now() - startTime), 250);
     return () => clearInterval(id);
   }, [status, startTime]);
-
-  useEffect(() => {
-    handleGenerate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const activeOrder = useMemo(() => slots.filter(Boolean), [slots]);
 
@@ -62,6 +59,7 @@ function App() {
     setStartTime(null);
     setMessage("Press Start to play with these settings.");
     setSeedInput(next.seed);
+    setCopied(false);
   };
 
   const handleStart = () => {
@@ -88,7 +86,7 @@ function App() {
 
   const onDropSlot = (slotIndex: number) => {
     const currentId = drag.draggingId;
-    if (!currentId || !puzzle || status === "solved") return;
+    if (!currentId || !puzzle || status !== "playing") return;
     setSlots((prev) => {
       const next = [...prev];
       next[slotIndex] = currentId;
@@ -103,7 +101,7 @@ function App() {
     if (!puzzle) return;
     evaluateWin(slots);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slots]);
+    }, [slots]);
 
   const onValidate = () => {
     if (!puzzle) return;
@@ -141,23 +139,48 @@ function App() {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(payload);
       setMessage("Seed copied to clipboard.");
+      setCopied(true);
     } else {
       setMessage(payload);
     }
   };
 
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(id);
+  }, [copied]);
+
+  const onResetStats = () => {
+    setMoves(0);
+    setElapsed(0);
+    setStartTime(null);
+    setStatus("idle");
+    if (puzzle) {
+      setSlots(resetSlots(puzzle.settings.tileCount));
+      setMessage("Stats reset. Ready when you are.");
+    } else {
+      setMessage("Stats reset. Generate a puzzle to start.");
+    }
+  };
+
+
   return (
     <div className="app">
       <header className="site-header">
-        <h1>PCP Pattern Pursuit</h1>
-        <p className="subtitle">Drag domino-like tiles so top and bottom strings match.</p>
+        <h1>
+          <span className="holo">PCP</span> Pattern Pursuit
+        </h1>
+        <p className="subtitle">
+          Drag domino-like tiles into order until the machine agrees: top string equals bottom string.
+        </p>
       </header>
 
       <section className="setup-row">
         {showPanel ? (
           <div className="setup-panel">
             <div className="setup-header">
-              <h2>Setup - Stats - Actions</h2>
+              <h2>Control Deck</h2>
               <button className="ghost" onClick={() => setShowPanel(false)}>
                 Hide
               </button>
@@ -167,7 +190,19 @@ function App() {
                 <h3>Setup</h3>
                 <label className="field">
                   <span>Preset</span>
-                  <select value={preset} onChange={(e) => setPreset(e.target.value as PresetName)}>
+                  <select
+                    value={preset}
+                    onChange={(e) => {
+                      const nextPreset = e.target.value as PresetName;
+                      setPreset(nextPreset);
+                      setSeedInput("");
+                      setCopied(false);
+                      setPuzzle(null);
+                      setSlots([]);
+                      setStatus("idle");
+                      setMessage("Generate a puzzle to begin.");
+                    }}
+                  >
                     {Object.entries(presetLabels).map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
@@ -175,21 +210,34 @@ function App() {
                     ))}
                   </select>
                 </label>
-                <label className="field">
+                <label className="field seed-field">
                   <span>Seed</span>
-                  <input
-                    value={seedInput}
-                    onChange={(e) => setSeedInput(e.target.value)}
-                    placeholder="blank = random"
-                  />
+                  <div className="seed-input-row">
+                    <input
+                      value={seedInput}
+                      onChange={(e) => {
+                        setSeedInput(e.target.value);
+                        setCopied(false);
+                      }}
+                      placeholder="blank = random"
+                    />
+                    <button
+                      className={`seed-copy ${copied ? "copied" : ""}`}
+                      onClick={onShareSeed}
+                      disabled={!puzzle}
+                    >
+                      <span className="copy-icon"></span>
+                      <span>{copied ? "Copied" : "Copy"}</span>
+                    </button>
+                  </div>
                 </label>
                 <button onClick={handleGenerate} className="primary">
-                  Generate
+                  Generate Puzzle
                 </button>
               </div>
 
               <div className="panel-section setup-col setup-col--divider">
-                <h3>Stats</h3>
+                <h3>Telemetry</h3>
                 <div className="stat-row">
                   <span>Mode</span>
                   <strong>{presetLabels[preset]}</strong>
@@ -202,31 +250,18 @@ function App() {
                   <span>Moves</span>
                   <strong>{moves}</strong>
                 </div>
+                <button className="ghost" onClick={onResetStats}>
+                  Reset stats
+                </button>
                 <button className="start-button" onClick={handleStart} disabled={!puzzle}>
-                  Start
-                </button>
-              </div>
-
-              <div className="panel-section setup-col actions-col">
-                <h3>Actions</h3>
-                <button onClick={onClearSolution} disabled={!puzzle}>
-                  Clear solution row
-                </button>
-                <button onClick={onValidate} disabled={!puzzle}>
-                  Validate
-                </button>
-                <button onClick={onShowSolution} disabled={!puzzle}>
-                  Show solution
-                </button>
-                <button onClick={onShareSeed} disabled={!puzzle}>
-                  Share seed
+                  Start Run
                 </button>
               </div>
             </div>
           </div>
         ) : (
           <div className="setup-placeholder">
-            <span>Setup - Stats - Actions</span>
+            <span>Control Deck hidden</span>
             <button className="ghost" onClick={() => setShowPanel(true)}>
               Show
             </button>
@@ -234,22 +269,37 @@ function App() {
         )}
       </section>
 
-      <section className="rules">
-        <h3>How to play</h3>
-        <ul>
-          <li>Use every tile exactly once in the solution slots.</li>
-          <li>Order matters: concatenate all top strings in order and all bottom strings in the same order.</li>
-          <li>You win when the full top string equals the full bottom string.</li>
-          <li>Tiles can have different top/bottom lengths; overall top and bottom totals are balanced.</li>
-          <li>Validate anytime, or press Show to auto-place the solution (or reveal unsolvable in Extreme).</li>
-        </ul>
-      </section>
+      {showBrief ? (
+        <section className="rules">
+          <div className="rules__header">
+            <h3>Mission Brief</h3>
+            <button className="ghost" onClick={() => setShowBrief(false)}>
+              Hide
+            </button>
+          </div>
+          <ul>
+            <li>Use every tile exactly once to complete the Turing tape.</li>
+            <li>Order matters: concatenate all top strings in order and all bottom strings in the same order.</li>
+            <li>You win when the full top string equals the full bottom string.</li>
+            <li>Validate anytime, or press Show to auto-place the solution (or reveal unsolvable in Extreme).</li>
+          </ul>
+        </section>
+      ) : (
+        <section className="rules rules--placeholder">
+          <div className="rules__placeholder">
+            <span>Mission Brief</span>
+            <button className="ghost" onClick={() => setShowBrief(true)}>
+              Show
+            </button>
+          </div>
+        </section>
+      )}
 
       <main className="main">
         <section className="board">
           <div className="tray">
             <div className="tray__header">
-              <h3>Available tiles</h3>
+              <h3>Tile rack</h3>
               {!puzzle && <p className="hint">Generate a puzzle to begin.</p>}
             </div>
             <div className="tray__cards">
@@ -257,7 +307,7 @@ function App() {
                 <div
                   key={tile.id}
                   className="tile-card"
-                  draggable
+                  draggable={status === "playing"}
                   onDragStart={() => setDrag({ draggingId: tile.id })}
                   onDragEnd={() => setDrag({ draggingId: null })}
                 >
@@ -302,6 +352,18 @@ function App() {
                   </div>
                 );
               })}
+            </div>
+
+            <div className="solution__actions">
+              <button onClick={onClearSolution} disabled={!puzzle}>
+                Clear solution row
+              </button>
+              <button onClick={onValidate} disabled={!puzzle}>
+                Validate
+              </button>
+              <button onClick={onShowSolution} disabled={!puzzle}>
+                Show solution
+              </button>
             </div>
           </div>
         </section>
