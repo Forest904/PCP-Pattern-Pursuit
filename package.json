@@ -1,0 +1,14 @@
+{
+  "name": "pcp-pattern-pursuit",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "npm --workspace apps/web run dev",
+    "build": "npm --workspace apps/web run build",
+    "preview": "npm --workspace apps/web run preview",
+    "test": "npm --workspace packages/pcp-engine run test",
+    "lint": "npm --workspace apps/web run lint"
+  }
+}
