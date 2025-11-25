@@ -521,6 +521,31 @@ button.start-button {
   padding: 0.45rem 0.7rem;
 }
 
+.victory-banner {
+  position: relative;
+  padding: 0.65rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid rgba(90, 240, 177, 0.6);
+  background: linear-gradient(120deg, rgba(90, 240, 177, 0.1), rgba(124, 224, 255, 0.08));
+  box-shadow: 0 12px 40px rgba(90, 240, 177, 0.25), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  overflow: hidden;
+}
+
+.victory-banner__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.victory-banner__emoji {
+  font-size: 1.4rem;
+  display: inline-block;
+}
 .rules {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(124, 224, 255, 0.18);

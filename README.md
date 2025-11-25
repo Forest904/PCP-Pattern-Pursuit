@@ -1,10 +1,10 @@
 # PCP Pattern Pursuit
 
-A web-first puzzle game based on the Post Correspondence Problem (PCP). Build a stack using every tile exactly once so the concatenated top strings equal the concatenated bottom strings; tiles may differ in length but the full sequences must match. Built for browsers now (React + TypeScript + Vite), with a shared `pcp-engine` core to reuse in a future Flutter/Android app.
+A web-first puzzle game based on the Post Correspondence Problem (PCP). Build a stack reusing tiles as needed so the concatenated top strings equal the concatenated bottom strings; tiles may differ in length but the full sequences must match. Built for browsers now (React + TypeScript + Vite), with a shared `pcp-engine` core to reuse in a future Flutter/Android app.
 
 ## Core Loop (Game Rules)
 - Generate a PCP instance (via seed or at random). Each tile has a top string and a bottom string; lengths can differ per tile but the overall top and bottom concatenations are balanced.
-- Drag tiles into the solution slots to build an ordered stack. You must use every tile exactly once; the tray keeps a reference copy so you can reorder freely.
+- Drag tiles into the solution slots to build an ordered stack. Slots can repeat tiles; the tray keeps a reference copy so you can reorder and reuse freely.
 - Objective: the concatenation of all top strings in order must exactly equal the concatenation of all bottom strings in the same order.
 - Validate at any time; if matched, you win. If stuck, hit **Show solution** to auto-place the correct stack and end the round.
 - Track elapsed time and move count per run; keep a local leaderboard/history.

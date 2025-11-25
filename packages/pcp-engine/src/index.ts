@@ -66,6 +66,14 @@ const randomString = (rng: Rng, alphabet: string[], length: number) => {
   return out;
 };
 
+const tweakString = (rng: Rng, value: string, alphabet: string[]): string => {
+  if (value.length === 0) return value;
+  const idx = Math.floor(rng() * value.length);
+  const current = value[idx];
+  const replacement = alphabet.find((c) => c !== current) ?? current;
+  return value.slice(0, idx) + replacement + value.slice(idx + 1);
+};
+
 const deriveSeed = (seed?: string) => {
   if (seed && seed.trim().length > 0) return seed.trim();
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -116,6 +124,19 @@ const randomPartition = (
   return null;
 };
 
+const partitionsForceEqualTile = (topParts: number[], bottomParts: number[]): boolean => {
+  let topOffset = 0;
+  let bottomOffset = 0;
+  for (let i = 0; i < topParts.length; i++) {
+    if (topOffset === bottomOffset && topParts[i] === bottomParts[i]) {
+      return true;
+    }
+    topOffset += topParts[i];
+    bottomOffset += bottomParts[i];
+  }
+  return false;
+};
+
 const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]; solution: string[] } => {
   const minLen = Math.max(1, settings.minLength);
   const maxLen = Math.max(minLen, settings.maxLength);
@@ -139,7 +160,8 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
 
       if (topParts && bottomParts) {
         const hasDiff = topParts.some((len, idx) => len !== bottomParts![idx]);
-        if (!hasDiff) {
+        const forcedMatch = partitionsForceEqualTile(topParts, bottomParts);
+        if (!hasDiff || forcedMatch) {
           topParts = null;
           bottomParts = null;
         }
@@ -156,6 +178,11 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
       totalLength = base.reduce((sum, v) => sum + v, 0);
     }
 
+    if (topParts && bottomParts && partitionsForceEqualTile(topParts, bottomParts)) {
+      attempts++;
+      continue;
+    }
+
     for (let targetAttempt = 0; targetAttempt < 60; targetAttempt++) {
       const target = randomString(rng, settings.alphabet, totalLength);
       const tiles: Tile[] = [];
@@ -164,7 +191,7 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
 
       let topOffset = 0;
       let bottomOffset = 0;
-      let duplicate = false;
+      let invalid = false;
 
       for (let i = 0; i < settings.tileCount; i++) {
         const topLen = topParts![i];
@@ -174,8 +201,8 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
         const bottomSlice = target.slice(bottomOffset, bottomOffset + bottomLen);
         const key = `${topSlice}|${bottomSlice}`;
 
-        if (seen.has(key)) {
-          duplicate = true;
+        if (seen.has(key) || topSlice === bottomSlice) {
+          invalid = true;
           break;
         }
 
@@ -188,7 +215,7 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
         bottomOffset += bottomLen;
       }
 
-      if (!duplicate) {
+      if (!invalid) {
         const shuffledTiles = shuffle(rng, tiles);
         return { tiles: shuffledTiles, solution };
       }
@@ -218,12 +245,14 @@ export const generatePuzzle = ({ preset, seed }: GenerateOptions): PuzzleInstanc
       do {
         top = randomString(rng, settings.alphabet, settings.minLength);
         bottom = randomString(rng, settings.alphabet, settings.maxLength);
-        if (bottom === top) {
-          bottom = `${bottom}${settings.alphabet[Math.floor(rng() * settings.alphabet.length)]}`;
-        }
+        if (bottom === top) bottom = tweakString(rng, bottom, settings.alphabet);
         key = `${top}|${bottom}`;
         guard++;
-      } while (seen.has(key) && guard < 50);
+      } while ((seen.has(key) || top === bottom) && guard < 50);
+
+      if (top === bottom) {
+        bottom = tweakString(rng, bottom, settings.alphabet);
+      }
 
       seen.add(key);
       return { id: makeId(rng, idx), top, bottom };
@@ -236,12 +265,7 @@ export const generatePuzzle = ({ preset, seed }: GenerateOptions): PuzzleInstanc
 };
 
 export const validateSolution = (puzzle: PuzzleInstance, order: string[]): boolean => {
-  if (order.length !== puzzle.settings.tileCount) return false;
-  const unique = new Set(order);
-  if (unique.size !== puzzle.settings.tileCount) return false;
-  for (const id of unique) {
-    if (!puzzle.tiles.find((t) => t.id === id)) return false;
-  }
+  if (order.length === 0) return false;
   const byId = new Map(puzzle.tiles.map((t) => [t.id, t]));
   let top = "";
   let bottom = "";
