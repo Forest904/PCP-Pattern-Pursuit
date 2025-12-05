@@ -80,12 +80,16 @@ const randomPartition = (rng, total, count, minLen, maxLen) => {
     }
     return null;
 };
-const partitionsForceEqualTile = (topParts, bottomParts) => {
+const partitionsForceEqualTile = (topParts, bottomParts, maxAlignedEquals) => {
     let topOffset = 0;
     let bottomOffset = 0;
+    let alignedEquals = 0;
     for (let i = 0; i < topParts.length; i++) {
         if (topOffset === bottomOffset && topParts[i] === bottomParts[i]) {
-            return true;
+            alignedEquals++;
+            if (alignedEquals > maxAlignedEquals) {
+                return true;
+            }
         }
         topOffset += topParts[i];
         bottomOffset += bottomParts[i];
@@ -97,6 +101,7 @@ const buildSolvableTiles = (rng, settings) => {
     const maxLen = Math.max(minLen, settings.maxLength);
     const minTotal = settings.tileCount * minLen;
     const maxTotal = settings.tileCount * maxLen;
+    const maxAlignedEquals = settings.tileCount >= 6 ? 1 : 0;
     let attempts = 0;
     while (attempts < 100) {
         let topParts = null;
@@ -104,12 +109,15 @@ const buildSolvableTiles = (rng, settings) => {
         let totalLength = 0;
         let tries = 0;
         while (tries < 50 && (!topParts || !bottomParts)) {
-            totalLength = Math.min(maxTotal, Math.max(minTotal, DEFAULT_TARGET_LENGTH + Math.floor(rng() * (maxTotal - minTotal + 1))));
+            const dynamicTargetBase = minTotal +
+                Math.floor(rng() *
+                    Math.max(1, Math.min(maxTotal - minTotal, Math.round((maxTotal - minTotal) * 0.6))));
+            totalLength = Math.min(maxTotal, Math.max(minTotal, dynamicTargetBase + Math.floor(rng() * (maxLen - minLen + 1))));
             topParts = randomPartition(rng, totalLength, settings.tileCount, minLen, maxLen);
             bottomParts = randomPartition(rng, totalLength, settings.tileCount, minLen, maxLen);
             if (topParts && bottomParts) {
                 const hasDiff = topParts.some((len, idx) => len !== bottomParts[idx]);
-                const forcedMatch = partitionsForceEqualTile(topParts, bottomParts);
+                const forcedMatch = partitionsForceEqualTile(topParts, bottomParts, maxAlignedEquals);
                 if (!hasDiff || forcedMatch) {
                     topParts = null;
                     bottomParts = null;
@@ -125,7 +133,7 @@ const buildSolvableTiles = (rng, settings) => {
             bottomParts = [...base].reverse();
             totalLength = base.reduce((sum, v) => sum + v, 0);
         }
-        if (topParts && bottomParts && partitionsForceEqualTile(topParts, bottomParts)) {
+        if (topParts && bottomParts && partitionsForceEqualTile(topParts, bottomParts, maxAlignedEquals)) {
             attempts++;
             continue;
         }

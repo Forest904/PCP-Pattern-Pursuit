@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { type PresetName, type PuzzleInstance, generatePuzzle, validateSolution, findSolution } from "@pcp/pattern-engine";
 import "./App.css";
 
@@ -44,12 +44,10 @@ function App() {
     return () => clearInterval(id);
   }, [status, startTime]);
 
-  const resetSlots = (count: number) => Array.from({ length: count }, () => "");
-
   const handleGenerate = () => {
     const next = generatePuzzle({ preset, seed: seedInput || undefined });
     setPuzzle(next);
-    setSlots(resetSlots(next.settings.tileCount));
+    setSlots([]);
     setStatus("idle");
     setMoves(0);
     setElapsed(0);
@@ -61,7 +59,7 @@ function App() {
 
   const handleStart = () => {
     if (!puzzle) return;
-    setSlots(resetSlots(puzzle.settings.tileCount));
+    setSlots([]);
     setMoves(0);
     setElapsed(0);
     setStartTime(Date.now());
@@ -81,12 +79,25 @@ function App() {
     }
   };
 
-  const onDropSlot = (slotIndex: number) => {
+  const placeTile = (targetIndex: number, mode: "insert" | "replace") => {
     const currentId = drag.draggingId;
     if (!currentId || !puzzle || status !== "playing") return;
+
     setSlots((prev) => {
-      const next = [...prev];
-      next[slotIndex] = currentId;
+      let next = [...prev];
+      if (mode === "insert") {
+        next.splice(targetIndex, 0, currentId);
+      } else {
+        if (targetIndex >= next.length) {
+          next.push(currentId);
+        } else {
+          next[targetIndex] = currentId;
+        }
+      }
+      const limit = puzzle.settings.tileCount;
+      if (next.length > limit) {
+        next = next.slice(0, limit);
+      }
       return next;
     });
     setMoves((m) => m + 1);
@@ -94,18 +105,20 @@ function App() {
     setStatus("playing");
   };
 
+  const onDropInsert = (index: number) => placeTile(index, "insert");
+  const onDropReplace = (index: number) => placeTile(index, "replace");
+
   useEffect(() => {
     if (!puzzle) return;
     evaluateWin(slots);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [slots]);
+  }, [slots]);
 
   const onShowSolution = () => {
     if (!puzzle) return;
     const solution = findSolution(puzzle);
     if (solution) {
-      const filled = resetSlots(puzzle.settings.tileCount).map((_, idx) => solution[idx] || "");
-      setSlots(filled);
+      setSlots(solution.slice(0, puzzle.settings.tileCount));
       setStatus("solved");
       setMessage("Solution revealed.");
     } else {
@@ -117,7 +130,7 @@ function App() {
 
   const onClearSolution = () => {
     if (!puzzle) return;
-    setSlots(resetSlots(puzzle.settings.tileCount));
+    setSlots([]);
     setMessage("Solution row cleared.");
     setStatus("playing");
   };
@@ -146,13 +159,16 @@ function App() {
     setStartTime(null);
     setStatus("idle");
     if (puzzle) {
-      setSlots(resetSlots(puzzle.settings.tileCount));
+      setSlots([]);
       setMessage("Stats reset. Ready when you are.");
     } else {
       setMessage("Stats reset. Generate a puzzle to start.");
     }
   };
 
+  const slotVars: CSSProperties = {
+    ["--slot-count" as string]: Math.max(1, slots.length || 1),
+  };
 
   return (
     <div className="app">
@@ -164,6 +180,31 @@ function App() {
           Drag domino-like tiles into order until the machine agrees: top string equals bottom string.
         </p>
       </header>
+
+      {showBrief ? (
+        <section className="rules">
+          <div className="rules__header">
+            <h3>Game Rules</h3>
+            <button className="ghost" onClick={() => setShowBrief(false)}>
+              Hide
+            </button>
+          </div>
+          <ul>
+            <li>Reuse tiles as needed to fill all the solution slots; slots can hold duplicates.</li>
+            <li>You win when the full top string equals the full bottom string.</li>
+            <li>The game ends automatically when you land on a matching stack; press Show to reveal if you get stuck.</li>
+          </ul>
+        </section>
+      ) : (
+        <section className="rules rules--placeholder">
+          <div className="rules__placeholder">
+            <span>Mission Brief</span>
+            <button className="ghost" onClick={() => setShowBrief(true)}>
+              Show
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="setup-row">
         {showPanel ? (
@@ -258,31 +299,6 @@ function App() {
         )}
       </section>
 
-      {showBrief ? (
-        <section className="rules">
-          <div className="rules__header">
-            <h3>Game Rules</h3>
-            <button className="ghost" onClick={() => setShowBrief(false)}>
-              Hide
-            </button>
-          </div>
-          <ul>
-            <li>Reuse tiles as needed to fill all the solution slots; slots can hold duplicates.</li>
-            <li>You win when the full top string equals the full bottom string.</li>
-            <li>The game ends automatically when you land on a matching stack; press Show to reveal if you get stuck.</li>
-          </ul>
-        </section>
-      ) : (
-        <section className="rules rules--placeholder">
-          <div className="rules__placeholder">
-            <span>Mission Brief</span>
-            <button className="ghost" onClick={() => setShowBrief(true)}>
-              Show
-            </button>
-          </div>
-        </section>
-      )}
-
       {puzzle && (
         <main className="main">
           <section className="board">
@@ -310,57 +326,85 @@ function App() {
             <div className="solution">
               <div className="solution__header">
                 <h3>Solution</h3>
-                <p className="hint">Drag tiles here; slots can be overwritten.</p>
+                <p className="hint">Drop tiles here; drag between tiles to insert and reorder.</p>
                 <div className="message-inline">
                   {status === "solved" ? (
                     <div className="victory-banner">
                       <div className="victory-banner__content">
-                        <span className="victory-banner__emoji">✨</span>
+                        <span className="victory-banner__emoji">*</span>
                         <strong>Perfect Match!</strong>
                       </div>
                     </div>
                   ) : (
                     <>
                       {status === "unsolved" && <span className="badge warn big">Unsolvable</span>}
-                    {message && <strong>{message}</strong>}
-                  </>
+                      {message && <strong>{message}</strong>}
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="solution__slots" style={slotVars}>
+                {slots.length === 0 && (
+                  <div
+                    className="solution__dropzone solution__dropzone--solo"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => onDropInsert(0)}
+                  >
+                    <span className="sr-only">Place the first tile</span>
+                  </div>
                 )}
-              </div>
-              </div>
-              <div className="solution__slots">
                 {slots.map((id, idx) => {
                   const tile = puzzle.tiles.find((t) => t.id === id);
                   return (
-                    <div
-                      key={idx}
-                      className="solution__slot"
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => onDropSlot(idx)}
-                    >
-                      <div className="slot__label">Slot {idx + 1}</div>
-                      {tile ? (
-                        <div className="tile-card tile-card--small">
-                          <div className="tile-card__half tile-card__half--top">{tile.top}</div>
-                          <div className="tile-card__divider" />
-                          <div className="tile-card__half tile-card__half--bottom">{tile.bottom}</div>
+                    <Fragment key={`${id}-${idx}`}>
+                      <div
+                        className="solution__dropzone"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => onDropInsert(idx)}
+                      >
+                        <span className="sr-only">Insert before slot {idx + 1}</span>
+                      </div>
+
+                      <div
+                        className="solution__slot"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => onDropReplace(idx)}
+                      >
+                        <div className="slot__label">Slot {idx + 1}</div>
+                        {tile ? (
+                          <div className="tile-card tile-card--small">
+                            <div className="tile-card__half tile-card__half--top">{tile.top}</div>
+                            <div className="tile-card__divider" />
+                            <div className="tile-card__half tile-card__half--bottom">{tile.bottom}</div>
+                          </div>
+                        ) : (
+                          <div className="slot__empty">Drop here</div>
+                        )}
+                      </div>
+
+                      {idx === slots.length - 1 && (
+                        <div
+                          className="solution__dropzone"
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={() => onDropInsert(idx + 1)}
+                        >
+                          <span className="sr-only">Insert after slot {idx + 1}</span>
                         </div>
-                      ) : (
-                        <div className="slot__empty">Drop here</div>
                       )}
-                    </div>
+                    </Fragment>
                   );
                 })}
               </div>
 
-            <div className="solution__actions">
-              <button onClick={onClearSolution} disabled={!puzzle}>
-                Clear solution row
-              </button>
-              <button onClick={onShowSolution} disabled={!puzzle}>
-                Show solution
-              </button>
+              <div className="solution__actions">
+                <button onClick={onClearSolution} disabled={!puzzle}>
+                  Clear solution row
+                </button>
+                <button onClick={onShowSolution} disabled={!puzzle}>
+                  Show solution
+                </button>
+              </div>
             </div>
-          </div>
           </section>
         </main>
       )}
