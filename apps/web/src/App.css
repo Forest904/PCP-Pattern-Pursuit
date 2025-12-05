@@ -238,6 +238,69 @@ body {
   gap: 0.5rem;
 }
 
+.field__hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0.05rem 0 0;
+}
+
+.knob-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.55rem;
+}
+
+.toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.55rem;
+}
+
+.checkbox-field {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.checkbox-field__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.checkbox-field__copy strong {
+  font-size: 0.95rem;
+}
+
+.ladder-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 0.65rem;
+}
+
+.ladder-button {
+  align-self: stretch;
+  height: 100%;
+}
+
+.ladder-nav {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.45rem;
+}
+
 .seed-copy {
   background: linear-gradient(135deg, rgba(124, 224, 255, 0.22), rgba(90, 240, 177, 0.22));
   color: var(--ink);

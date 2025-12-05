@@ -15,9 +15,13 @@ Presets set defaults that the user can still tweak.
 - **Easy**: 3 tiles, alphabet size 2, string length 2-3, guaranteed solvable, short solution path.
 - **Medium**: 5 tiles, alphabet size 2-3, string length 2-4, guaranteed solvable, moderate solution length.
 - **Hard**: 7 tiles, alphabet size 3, string length 3-5, guaranteed solvable, longer/near-unique solution.
+- **Tricky**: 6 tiles, alphabet size 3, string length 2-4, solvable but built to allow multiple valid answers.
+- **Expert/Marathon**: 8-10 tiles, alphabet size 5, string length 4-7, may produce unsolvable seeds for endurance runs.
+- **Theme variants**: Binary-only alphabet `{0,1}` for a digital feel, or wide alphabet (5-6 letters) for richer patterns.
 
 ## Configurable Settings
-- Number of tiles, alphabet size, min/max string length, and solution length limits.
+- Number of tiles, alphabet size, alphabet theme, min/max string length, allow-unsolvable toggle, and unique-solution toggle; settings are encoded into the seed/share text for easy replay.
+- Ladder runs: generate multi-level sequences from a single seed lineage, progressively bumping string lengths and alphabet size per level.
 - Seed input (optional). If blank, a random seed is generated; the seed drives the generator for reproducible puzzles.
 - Mode toggles: allow repeated tiles, enforce unique solution.
 - UI: enable live mismatch highlighting, auto-validate on each drop, and confirm-before-reset.
@@ -55,10 +59,3 @@ Presets set defaults that the user can still tweak.
 - Intro screen explains PCP in plain language and the win condition.
 - Game screen: toolbar (preset selector, seed display/share, timer, moves, reset, show solution), board with slots, tile tray, and status area.
 - Leaderboard/history: local-only list of past seeds with time and moves; no enforced timer, just stats.
-
-## Roadmap
-- Hints (next tile, partial validation, contradiction detection).
-- Theming and richer visuals/animations.
-- PWA installability; offline cache.
-- Cloud sync for history/leaderboard (optional, opt-in).
-- Localization and accessibility polish.

@@ -1,4 +1,4 @@
-export type PresetName = "easy" | "medium" | "hard";
+export type PresetName = "easy" | "medium" | "hard" | "tricky" | "expert";
 
 export type Tile = {
   id: string;
@@ -6,12 +6,17 @@ export type Tile = {
   bottom: string;
 };
 
+export type AlphabetTheme = "preset" | "binary" | "wide";
+
 export type PuzzleSettings = {
   tileCount: number;
+  tileCountRange?: [number, number];
   alphabet: string[];
   minLength: number;
   maxLength: number;
   allowUnsolvable: boolean;
+  forceUnique: boolean;
+  theme?: AlphabetTheme;
 };
 
 export type PuzzleInstance = {
@@ -23,17 +28,65 @@ export type PuzzleInstance = {
   solution?: string[]; // tile ids in order
 };
 
-export const PRESETS: Record<PresetName, PuzzleSettings> = {
-  easy: { tileCount: 3, alphabet: ["a", "b"], minLength: 2, maxLength: 3, allowUnsolvable: false },
-  medium: { tileCount: 5, alphabet: ["a", "b", "c"], minLength: 2, maxLength: 4, allowUnsolvable: false },
-  hard: { tileCount: 7, alphabet: ["a", "b", "c"], minLength: 3, maxLength: 5, allowUnsolvable: false },
-};
+const ALPHABET_POOL = "abcdefghijklmnopqrstuvwxyz".split("");
 
-const DEFAULT_TARGET_LENGTH = 7;
+export const PRESETS: Record<PresetName, PuzzleSettings> = {
+  easy: {
+    tileCount: 3,
+    alphabet: ALPHABET_POOL.slice(0, 2),
+    minLength: 2,
+    maxLength: 3,
+    allowUnsolvable: false,
+    forceUnique: true,
+  },
+  medium: {
+    tileCount: 5,
+    alphabet: ALPHABET_POOL.slice(0, 3),
+    minLength: 2,
+    maxLength: 4,
+    allowUnsolvable: false,
+    forceUnique: true,
+  },
+  hard: {
+    tileCount: 7,
+    alphabet: ALPHABET_POOL.slice(0, 3),
+    minLength: 3,
+    maxLength: 5,
+    allowUnsolvable: false,
+    forceUnique: true,
+  },
+  tricky: {
+    tileCount: 6,
+    alphabet: ALPHABET_POOL.slice(0, 3),
+    minLength: 2,
+    maxLength: 4,
+    allowUnsolvable: false,
+    forceUnique: false,
+  },
+  expert: {
+    tileCount: 9,
+    tileCountRange: [8, 10],
+    alphabet: ALPHABET_POOL.slice(0, 5),
+    minLength: 4,
+    maxLength: 7,
+    allowUnsolvable: true,
+    forceUnique: true,
+  },
+};
 
 export type GenerateOptions = {
   preset: PresetName;
   seed?: string;
+  overrides?: Partial<{
+    tileCount: number;
+    minLength: number;
+    maxLength: number;
+    alphabet: string[];
+    alphabetSize: number;
+    allowUnsolvable: boolean;
+    forceUnique: boolean;
+    theme: AlphabetTheme;
+  }>;
 };
 
 type Rng = () => number;
@@ -80,6 +133,53 @@ const deriveSeed = (seed?: string) => {
     return crypto.randomUUID();
   }
   return `seed-${Math.random().toString(36).slice(2, 10)}`;
+};
+
+const clampInt = (value: number, min: number, max: number) => Math.min(max, Math.max(min, Math.round(value)));
+
+const buildAlphabet = (size: number) => ALPHABET_POOL.slice(0, clampInt(size, 1, ALPHABET_POOL.length));
+
+const resolveSettings = (preset: PresetName, rng: Rng, overrides?: GenerateOptions["overrides"]): PuzzleSettings => {
+  const base = PRESETS[preset];
+  const tileCountRange: [number, number] = overrides?.tileCount
+    ? [overrides.tileCount, overrides.tileCount]
+    : base.tileCountRange ?? [base.tileCount, base.tileCount];
+  const tileCountSpan = tileCountRange[1] - tileCountRange[0] + 1;
+  const tileCount =
+    overrides?.tileCount ?? clampInt(tileCountRange[0] + Math.floor(rng() * tileCountSpan), 2, 24);
+
+  const minLength = clampInt(overrides?.minLength ?? base.minLength, 1, 48);
+  const maxLength = clampInt(overrides?.maxLength ?? base.maxLength, minLength, 64);
+
+  const alphabetOverride = overrides?.alphabet;
+  const theme: AlphabetTheme = overrides?.theme ?? "preset";
+  let alphabetSize = overrides?.alphabetSize ?? alphabetOverride?.length ?? base.alphabet.length;
+  let alphabet: string[];
+
+  if (alphabetOverride) {
+    alphabet = [...alphabetOverride];
+    alphabetSize = alphabet.length;
+  } else if (theme === "binary") {
+    alphabet = ["0", "1"];
+    alphabetSize = alphabet.length;
+  } else if (theme === "wide") {
+    alphabetSize = clampInt(Math.max(alphabetSize, 5), 5, 6);
+    alphabet = buildAlphabet(alphabetSize);
+  } else {
+    alphabet = buildAlphabet(alphabetSize);
+    alphabetSize = alphabet.length;
+  }
+
+  return {
+    tileCount,
+    tileCountRange,
+    alphabet,
+    minLength,
+    maxLength,
+    allowUnsolvable: overrides?.allowUnsolvable ?? base.allowUnsolvable,
+    forceUnique: overrides?.forceUnique ?? base.forceUnique,
+    theme,
+  };
 };
 
 const shuffle = <T,>(rng: Rng, arr: T[]): T[] => {
@@ -146,7 +246,8 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
   const maxLen = Math.max(minLen, settings.maxLength);
   const minTotal = settings.tileCount * minLen;
   const maxTotal = settings.tileCount * maxLen;
-  const maxAlignedEquals = settings.tileCount >= 6 ? 1 : 0;
+  const requireUnique = settings.forceUnique !== false;
+  const maxAlignedEquals = requireUnique ? (settings.tileCount >= 6 ? 1 : 0) : settings.tileCount;
 
   let attempts = 0;
   while (attempts < 100) {
@@ -177,7 +278,7 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
 
       if (topParts && bottomParts) {
         const hasDiff = topParts.some((len, idx) => len !== bottomParts![idx]);
-        const forcedMatch = partitionsForceEqualTile(topParts, bottomParts, maxAlignedEquals);
+        const forcedMatch = requireUnique && partitionsForceEqualTile(topParts, bottomParts, maxAlignedEquals);
         if (!hasDiff || forcedMatch) {
           topParts = null;
           bottomParts = null;
@@ -195,7 +296,12 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
       totalLength = base.reduce((sum, v) => sum + v, 0);
     }
 
-    if (topParts && bottomParts && partitionsForceEqualTile(topParts, bottomParts, maxAlignedEquals)) {
+    if (
+      requireUnique &&
+      topParts &&
+      bottomParts &&
+      partitionsForceEqualTile(topParts, bottomParts, maxAlignedEquals)
+    ) {
       attempts++;
       continue;
     }
@@ -241,13 +347,13 @@ const buildSolvableTiles = (rng: Rng, settings: PuzzleSettings): { tiles: Tile[]
     attempts++;
   }
 
-  throw new Error("Failed to generate a unique solvable tile set.");
+  throw new Error("Failed to generate a solvable tile set.");
 };
 
-export const generatePuzzle = ({ preset, seed }: GenerateOptions): PuzzleInstance => {
-  const settings = PRESETS[preset];
+export const generatePuzzle = ({ preset, seed, overrides }: GenerateOptions): PuzzleInstance => {
   const actualSeed = deriveSeed(seed);
   const rng = mulberry32(hashSeed(actualSeed));
+  const settings = resolveSettings(preset, rng, overrides);
 
   const shouldBeUnsolvable = settings.allowUnsolvable && rng() > 0.6;
 
@@ -260,8 +366,10 @@ export const generatePuzzle = ({ preset, seed }: GenerateOptions): PuzzleInstanc
       let guard = 0;
 
       do {
-        top = randomString(rng, settings.alphabet, settings.minLength);
-        bottom = randomString(rng, settings.alphabet, settings.maxLength);
+        const topLen = settings.minLength + Math.floor(rng() * Math.max(1, settings.maxLength - settings.minLength + 1));
+        const bottomLen = settings.minLength + Math.floor(rng() * Math.max(1, settings.maxLength - settings.minLength + 1));
+        top = randomString(rng, settings.alphabet, topLen);
+        bottom = randomString(rng, settings.alphabet, bottomLen);
         if (bottom === top) bottom = tweakString(rng, bottom, settings.alphabet);
         key = `${top}|${bottom}`;
         guard++;

@@ -1,11 +1,30 @@
 import { Fragment, useEffect, useState, type CSSProperties } from "react";
-import { type PresetName, type PuzzleInstance, generatePuzzle, validateSolution, findSolution } from "@pcp/pattern-engine";
+import {
+  PRESETS,
+  type AlphabetTheme,
+  type PresetName,
+  type PuzzleInstance,
+  type PuzzleSettings,
+  generatePuzzle,
+  validateSolution,
+  findSolution,
+} from "@pcp/pattern-engine";
 import "./App.css";
 
 type Status = "idle" | "playing" | "solved" | "unsolved";
 
 type DragState = {
   draggingId: string | null;
+};
+
+type KnobState = {
+  tileCount: number;
+  minLength: number;
+  maxLength: number;
+  alphabetSize: number;
+  allowUnsolvable: boolean;
+  forceUnique: boolean;
+  theme: AlphabetTheme;
 };
 
 const formatTime = (ms: number) => {
@@ -21,10 +40,175 @@ const presetLabels: Record<PresetName, string> = {
   easy: "Easy",
   medium: "Medium",
   hard: "Hard",
+  tricky: "Tricky",
+  expert: "Expert/Marathon",
+};
+
+const presetOrder: PresetName[] = ["easy", "medium", "hard", "tricky", "expert"];
+
+const normalizeKnobs = (value: KnobState): KnobState => {
+  const minLength = Math.min(48, Math.max(1, Math.round(value.minLength)));
+  const maxLength = Math.min(64, Math.max(minLength, Math.round(value.maxLength)));
+  const tileCount = Math.min(16, Math.max(2, Math.round(value.tileCount)));
+  const alphabetSizeRaw = Math.min(26, Math.max(1, Math.round(value.alphabetSize)));
+  const theme: AlphabetTheme = value.theme === "binary" || value.theme === "wide" ? value.theme : "preset";
+  const alphabetSize =
+    theme === "binary" ? 2 : theme === "wide" ? Math.min(6, Math.max(5, alphabetSizeRaw)) : alphabetSizeRaw;
+  return {
+    tileCount,
+    minLength,
+    maxLength,
+    alphabetSize,
+    allowUnsolvable: value.allowUnsolvable,
+    forceUnique: value.forceUnique,
+    theme,
+  };
+};
+
+const settingsToKnobs = (settings: PuzzleSettings): KnobState =>
+  normalizeKnobs({
+    tileCount: settings.tileCount,
+    minLength: settings.minLength,
+    maxLength: settings.maxLength,
+    alphabetSize: settings.alphabet.length,
+    allowUnsolvable: settings.allowUnsolvable,
+    forceUnique: settings.forceUnique,
+    theme: settings.theme ?? "preset",
+  });
+
+const presetDefaults: Record<PresetName, KnobState> = presetOrder.reduce((acc, name) => {
+  acc[name] = settingsToKnobs(PRESETS[name]);
+  return acc;
+}, {} as Record<PresetName, KnobState>);
+
+const formatSeedPayload = (seed: string, preset: PresetName, knobs: KnobState, ladderLevels?: number) => {
+  const tokens = [
+    seed,
+    preset,
+    `tc${knobs.tileCount}`,
+    `min${knobs.minLength}`,
+    `max${knobs.maxLength}`,
+    `a${knobs.alphabetSize}`,
+    `uns${knobs.allowUnsolvable ? 1 : 0}`,
+    `uniq${knobs.forceUnique ? 1 : 0}`,
+  ];
+  if (knobs.theme && knobs.theme !== "preset") {
+    tokens.push(`th${knobs.theme}`);
+  }
+  if (ladderLevels && ladderLevels > 1) {
+    tokens.push(`lad${ladderLevels}`);
+  }
+  return tokens.join("|");
+};
+
+const parseSeedPayload = (
+  raw: string,
+): { seed?: string; preset?: PresetName; knobs?: Partial<KnobState>; ladderLevels?: number } => {
+  const trimmed = raw.trim();
+  if (!trimmed) return {};
+  if (!trimmed.includes("|") && trimmed.includes(":")) {
+    const [seedPart, presetMaybe] = trimmed.split(":");
+    const preset = presetOrder.includes(presetMaybe as PresetName) ? (presetMaybe as PresetName) : undefined;
+    return { seed: seedPart, preset };
+  }
+  const parts = trimmed.split("|").filter(Boolean);
+  const [seedPart, ...tokens] = parts;
+  let preset: PresetName | undefined;
+  const knobTokens: string[] = [];
+
+  for (const token of tokens) {
+    if (!preset && presetOrder.includes(token as PresetName)) {
+      preset = token as PresetName;
+    } else {
+      knobTokens.push(token);
+    }
+  }
+  const knobs: Partial<KnobState> = {};
+  let ladderLevels: number | undefined;
+
+  for (const token of knobTokens) {
+    if (token.startsWith("tc")) {
+      const value = Number(token.slice(2));
+      if (!Number.isNaN(value)) knobs.tileCount = value;
+      continue;
+    }
+    if (token.startsWith("min")) {
+      const value = Number(token.slice(3));
+      if (!Number.isNaN(value)) knobs.minLength = value;
+      continue;
+    }
+    if (token.startsWith("max")) {
+      const value = Number(token.slice(3));
+      if (!Number.isNaN(value)) knobs.maxLength = value;
+      continue;
+    }
+    if (token.startsWith("a")) {
+      const value = Number(token.slice(1));
+      if (!Number.isNaN(value)) knobs.alphabetSize = value;
+      continue;
+    }
+    if (token.startsWith("uns")) {
+      const value = Number(token.slice(3));
+      knobs.allowUnsolvable = Number.isNaN(value) ? true : value > 0;
+      continue;
+    }
+    if (token.startsWith("uniq")) {
+      const value = Number(token.slice(4));
+      knobs.forceUnique = Number.isNaN(value) ? true : value > 0;
+      continue;
+    }
+    if (token.startsWith("th")) {
+      const value = token.slice(2);
+      if (value === "binary" || value === "wide" || value === "preset") {
+        knobs.theme = value;
+      }
+      continue;
+    }
+    if (token.startsWith("lad")) {
+      const value = Number(token.slice(3));
+      if (!Number.isNaN(value)) ladderLevels = value;
+    }
+  }
+
+  return {
+    seed: seedPart,
+    preset,
+    knobs: Object.keys(knobs).length ? knobs : undefined,
+    ladderLevels,
+  };
+};
+
+const knobsToOverrides = (value: KnobState) => ({
+  tileCount: value.tileCount,
+  minLength: value.minLength,
+  maxLength: value.maxLength,
+  alphabetSize: value.alphabetSize,
+  allowUnsolvable: value.allowUnsolvable,
+  forceUnique: value.forceUnique,
+  theme: value.theme,
+});
+
+const resolvePresetAndKnobs = (
+  parsed: ReturnType<typeof parseSeedPayload>,
+  currentPreset: PresetName,
+  currentKnobs: KnobState,
+): { preset: PresetName; knobs: KnobState } => {
+  const effectivePreset = parsed.preset ?? currentPreset;
+  const baseKnobs = presetDefaults[effectivePreset];
+  const allowCurrent = effectivePreset === currentPreset;
+  const mergedKnobs = normalizeKnobs({
+    ...baseKnobs,
+    ...(parsed.knobs ?? {}),
+    ...(allowCurrent ? currentKnobs : {}),
+  });
+  return { preset: effectivePreset, knobs: mergedKnobs };
 };
 
 function App() {
   const [preset, setPreset] = useState<PresetName>("easy");
+  const [knobs, setKnobs] = useState<KnobState>(() => presetDefaults["easy"]);
+  const [ladderLevels, setLadderLevels] = useState(3);
+  const [ladder, setLadder] = useState<{ baseSeed: string; puzzles: PuzzleInstance[]; index: number } | null>(null);
   const [seedInput, setSeedInput] = useState("");
   const [puzzle, setPuzzle] = useState<PuzzleInstance | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
@@ -44,17 +228,109 @@ function App() {
     return () => clearInterval(id);
   }, [status, startTime]);
 
-  const handleGenerate = () => {
-    const next = generatePuzzle({ preset, seed: seedInput || undefined });
-    setPuzzle(next);
+  const resetProgress = () => {
     setSlots([]);
     setStatus("idle");
     setMoves(0);
     setElapsed(0);
     setStartTime(null);
-    setMessage("Press Start to play.");
-    setSeedInput(next.seed);
+  };
+
+  const handleGenerate = () => {
+    const parsed = parseSeedPayload(seedInput);
+    if (parsed.ladderLevels && parsed.ladderLevels > 1) {
+      handleGenerateLadder(parsed.ladderLevels, parsed);
+      return;
+    }
+    const { preset: effectivePreset, knobs: mergedKnobs } = resolvePresetAndKnobs(parsed, preset, knobs);
+    const next = generatePuzzle({
+      preset: effectivePreset,
+      seed: parsed.seed || undefined,
+      overrides: knobsToOverrides(mergedKnobs),
+    });
+    const appliedKnobs = settingsToKnobs(next.settings);
+    setPreset(effectivePreset);
+    setKnobs(appliedKnobs);
+    setPuzzle(next);
+    setLadder(null);
+    resetProgress();
+    setMessage(
+      !next.solvable
+        ? "This seed is unsolvable."
+        : next.settings.allowUnsolvable
+        ? "Press Start - this seed might be unsolvable."
+        : next.settings.forceUnique
+          ? "Press Start to play."
+          : "Press Start - multiple solutions may exist.",
+    );
+    setSeedInput(formatSeedPayload(next.seed, effectivePreset, appliedKnobs));
     setCopied(false);
+  };
+
+  const handleGenerateLadder = (levelsInput?: number, parsedOverride?: ReturnType<typeof parseSeedPayload>) => {
+    const parsed = parsedOverride ?? parseSeedPayload(seedInput);
+    const { preset: effectivePreset, knobs: mergedKnobs } = resolvePresetAndKnobs(parsed, preset, knobs);
+    const levels = Math.max(2, Math.min(10, levelsInput ?? ladderLevels));
+
+    const levelKnobs = (level: number): KnobState => {
+      const lengthBump = level;
+      const maxBump = Math.ceil(level / 2);
+      const baseAlphabet =
+        mergedKnobs.theme === "binary"
+          ? 2
+          : mergedKnobs.theme === "wide"
+            ? Math.max(5, mergedKnobs.alphabetSize)
+            : mergedKnobs.alphabetSize;
+      const grownAlphabet =
+        mergedKnobs.theme === "binary"
+          ? 2
+          : mergedKnobs.theme === "wide"
+            ? Math.min(6, baseAlphabet + level)
+            : Math.min(26, baseAlphabet + level);
+      return normalizeKnobs({
+        ...mergedKnobs,
+        minLength: mergedKnobs.minLength + lengthBump,
+        maxLength: mergedKnobs.maxLength + maxBump,
+        alphabetSize: grownAlphabet,
+      });
+    };
+
+    const puzzles: PuzzleInstance[] = [];
+    const firstKnobs = levelKnobs(0);
+    const firstPuzzle = generatePuzzle({
+      preset: effectivePreset,
+      seed: parsed.seed || undefined,
+      overrides: knobsToOverrides(firstKnobs),
+    });
+    const baseSeed = firstPuzzle.seed;
+    puzzles.push(firstPuzzle);
+
+    for (let i = 1; i < levels; i++) {
+      const levelPuzzle = generatePuzzle({
+        preset: effectivePreset,
+        seed: `${baseSeed}-L${i}`,
+        overrides: knobsToOverrides(levelKnobs(i)),
+      });
+      puzzles.push(levelPuzzle);
+    }
+
+    setLadder({ baseSeed, puzzles, index: 0 });
+    setPreset(effectivePreset);
+    setKnobs(settingsToKnobs(firstPuzzle.settings));
+    setPuzzle(firstPuzzle);
+    resetProgress();
+    setMessage(
+      !firstPuzzle.solvable
+        ? `Ladder level 1/${levels} is unsolvable.`
+        : firstPuzzle.settings.allowUnsolvable
+          ? `Ladder level 1/${levels}. Might be unsolvable.`
+          : firstPuzzle.settings.forceUnique
+            ? `Ladder level 1/${levels}. Press Start.`
+            : `Ladder level 1/${levels}. Multiple solutions allowed.`,
+    );
+    setSeedInput(formatSeedPayload(baseSeed, effectivePreset, settingsToKnobs(firstPuzzle.settings), levels));
+    setCopied(false);
+    setLadderLevels(levels);
   };
 
   const handleStart = () => {
@@ -64,7 +340,15 @@ function App() {
     setElapsed(0);
     setStartTime(Date.now());
     setStatus("playing");
-    setMessage("Arrange the tiles below.");
+    if (!puzzle.solvable) {
+      setMessage("Explore the tiles — this seed is unsolvable.");
+    } else if (puzzle.settings.allowUnsolvable) {
+      setMessage("Arrange the tiles below. Heads up: this seed might be impossible.");
+    } else if (!puzzle.settings.forceUnique) {
+      setMessage("Arrange the tiles - multiple valid solutions are allowed.");
+    } else {
+      setMessage("Arrange the tiles below.");
+    }
   };
 
   const evaluateWin = (nextSlots: string[]) => {
@@ -114,6 +398,29 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slots]);
 
+  const moveToLadderLevel = (targetIndex: number) => {
+    if (!ladder) return;
+    const clamped = Math.min(Math.max(targetIndex, 0), ladder.puzzles.length - 1);
+    const nextPuzzle = ladder.puzzles[clamped];
+    setLadder({ ...ladder, index: clamped });
+    setPuzzle(nextPuzzle);
+    setKnobs(settingsToKnobs(nextPuzzle.settings));
+    resetProgress();
+    setMessage(
+      !nextPuzzle.solvable
+        ? `Ladder level ${clamped + 1}/${ladder.puzzles.length} is unsolvable.`
+        : nextPuzzle.settings.allowUnsolvable
+          ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Might be unsolvable.`
+          : nextPuzzle.settings.forceUnique
+            ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Press Start.`
+            : `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Multiple solutions allowed.`,
+    );
+    setSeedInput(
+      formatSeedPayload(ladder.baseSeed, nextPuzzle.preset, settingsToKnobs(ladder.puzzles[0].settings), ladder.puzzles.length),
+    );
+    setCopied(false);
+  };
+
   const onShowSolution = () => {
     if (!puzzle) return;
     const solution = findSolution(puzzle);
@@ -137,10 +444,15 @@ function App() {
 
   const onShareSeed = async () => {
     if (!puzzle) return;
-    const payload = `${puzzle.seed}:${puzzle.preset}`;
+    const payload = formatSeedPayload(
+      ladder ? ladder.baseSeed : puzzle.seed,
+      puzzle.preset,
+      ladder ? settingsToKnobs(ladder.puzzles[0].settings) : settingsToKnobs(puzzle.settings),
+      ladder?.puzzles.length,
+    );
     if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(payload);
-      setMessage("Seed copied to clipboard.");
+      setMessage("Seed + settings copied to clipboard.");
       setCopied(true);
     } else {
       setMessage(payload);
@@ -166,8 +478,9 @@ function App() {
     }
   };
 
+  const slotCount = puzzle ? Math.max(slots.length || 1, puzzle.settings.tileCount) : Math.max(1, slots.length || 1);
   const slotVars: CSSProperties = {
-    ["--slot-count" as string]: Math.max(1, slots.length || 1),
+    ["--slot-count" as string]: slotCount,
   };
 
   return (
@@ -224,13 +537,22 @@ function App() {
                     value={preset}
                     onChange={(e) => {
                       const nextPreset = e.target.value as PresetName;
+                      const nextDefaults = presetDefaults[nextPreset];
                       setPreset(nextPreset);
+                      setKnobs(nextDefaults);
                       setSeedInput("");
                       setCopied(false);
                       setPuzzle(null);
+                      setLadder(null);
                       setSlots([]);
                       setStatus("idle");
-                      setMessage("Generate a puzzle to begin.");
+                      setMessage(
+                        nextDefaults.allowUnsolvable
+                          ? "Generate a puzzle - this preset can include unsolvable seeds."
+                          : nextDefaults.forceUnique
+                            ? "Generate a puzzle to begin."
+                            : "Generate a puzzle with multiple possible answers.",
+                      );
                     }}
                   >
                     {Object.entries(presetLabels).map(([value, label]) => (
@@ -249,7 +571,7 @@ function App() {
                         setSeedInput(e.target.value);
                         setCopied(false);
                       }}
-                      placeholder="blank = random"
+                      placeholder="seed or share code (blank = random)"
                     />
                     <button
                       className={`seed-copy ${copied ? "copied" : ""}`}
@@ -261,21 +583,191 @@ function App() {
                     </button>
                   </div>
                 </label>
-                <button onClick={handleGenerate} className="primary">
-                  Generate Tiles
-                </button>
-              </div>
+                  <button onClick={handleGenerate} className="primary">
+                    Generate Tiles
+                  </button>
+                </div>
 
-              <div className="panel-section setup-col setup-col--divider">
-                <h3>Statistics</h3>
-                <div className="stat-row">
-                  <span>Mode</span>
-                  <strong>{presetLabels[preset]}</strong>
+                <div className="panel-section setup-col setup-col--divider">
+                  <h3>Generator knobs</h3>
+                  <div className="knob-grid">
+                    <label className="field">
+                      <span>Tile count</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={16}
+                        value={knobs.tileCount}
+                        onChange={(e) =>
+                          setKnobs((prev) =>
+                            normalizeKnobs({
+                              ...prev,
+                              tileCount: Number(e.target.value) || prev.tileCount,
+                            }),
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Alphabet size</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={26}
+                        value={knobs.alphabetSize}
+                        onChange={(e) =>
+                          setKnobs((prev) =>
+                            normalizeKnobs({
+                              ...prev,
+                              alphabetSize: Number(e.target.value) || prev.alphabetSize,
+                            }),
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Alphabet theme</span>
+                      <select
+                        value={knobs.theme}
+                        onChange={(e) =>
+                          setKnobs((prev) =>
+                            normalizeKnobs({
+                              ...prev,
+                              theme: e.target.value as AlphabetTheme,
+                            }),
+                          )
+                        }
+                      >
+                        <option value="preset">Preset/custom</option>
+                        <option value="binary">Binary only (0/1)</option>
+                        <option value="wide">Wide letters (5-6)</option>
+                      </select>
+                      <span className="field__hint">Switch feel without changing rules.</span>
+                    </label>
+                    <label className="field">
+                      <span>Min length</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={48}
+                        value={knobs.minLength}
+                        onChange={(e) =>
+                          setKnobs((prev) =>
+                            normalizeKnobs({
+                              ...prev,
+                              minLength: Number(e.target.value) || prev.minLength,
+                            }),
+                          )
+                        }
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Max length</span>
+                      <input
+                        type="number"
+                        min={knobs.minLength}
+                        max={64}
+                        value={knobs.maxLength}
+                        onChange={(e) =>
+                          setKnobs((prev) =>
+                            normalizeKnobs({
+                              ...prev,
+                              maxLength: Number(e.target.value) || prev.maxLength,
+                            }),
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="toggle-grid">
+                    <label className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={knobs.allowUnsolvable}
+                        onChange={(e) => setKnobs((prev) => ({ ...prev, allowUnsolvable: e.target.checked }))}
+                      />
+                      <div className="checkbox-field__copy">
+                        <strong>Allow unsolvable seeds</strong>
+                        <span className="field__hint">About a 40% chance when enabled.</span>
+                      </div>
+                    </label>
+                    <label className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={!knobs.forceUnique}
+                        onChange={(e) => setKnobs((prev) => ({ ...prev, forceUnique: !e.target.checked }))}
+                      />
+                      <div className="checkbox-field__copy">
+                        <strong>Allow multiple solutions</strong>
+                        <span className="field__hint">Enabled by default on Tricky.</span>
+                      </div>
+                    </label>
+                  </div>
+                  <div className="ladder-row">
+                    <label className="field">
+                      <span>Ladder levels</span>
+                      <input
+                        type="number"
+                        min={2}
+                        max={10}
+                        value={ladderLevels}
+                        onChange={(e) => setLadderLevels(Math.max(2, Math.min(10, Number(e.target.value) || ladderLevels)))}
+                      />
+                      <span className="field__hint">Builds a seed lineage that bumps lengths/alphabet each step.</span>
+                    </label>
+                    <button className="ghost ladder-button" onClick={() => handleGenerateLadder()}>
+                      Generate ladder
+                    </button>
+                  </div>
+                  <p className="field__hint">Knob choices are embedded in the seed/share text.</p>
                 </div>
-                <div className="stat-row">
-                  <span>Time</span>
-                  <strong>{formatTime(elapsed)}</strong>
-                </div>
+
+                <div className="panel-section setup-col">
+                  <h3>Statistics</h3>
+                  <div className="stat-row">
+                    <span>Mode</span>
+                    <strong>{presetLabels[preset]}</strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Tiles</span>
+                    <strong>{puzzle ? puzzle.settings.tileCount : knobs.tileCount}</strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Lengths</span>
+                    <strong>
+                      {puzzle
+                        ? `${puzzle.settings.minLength}-${puzzle.settings.maxLength}`
+                        : `${knobs.minLength}-${knobs.maxLength}`}
+                    </strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Alphabet</span>
+                    <strong>{puzzle ? puzzle.settings.alphabet.length : knobs.alphabetSize}</strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Solutions</span>
+                    <strong>
+                      {puzzle
+                        ? puzzle.settings.forceUnique
+                          ? "Unique"
+                          : "Multiple"
+                        : knobs.forceUnique
+                          ? "Unique"
+                          : "Multiple"}
+                    </strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Alphabet theme</span>
+                    <strong>{puzzle ? puzzle.settings.theme ?? "preset" : knobs.theme}</strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Ladder</span>
+                    <strong>{ladder ? `${ladder.index + 1}/${ladder.puzzles.length}` : "Single"}</strong>
+                  </div>
+                  <div className="stat-row">
+                    <span>Time</span>
+                    <strong>{formatTime(elapsed)}</strong>
+                  </div>
                 <div className="stat-row">
                   <span>Moves</span>
                   <strong>{moves}</strong>
@@ -286,6 +778,19 @@ function App() {
                 <button className="start-button" onClick={handleStart} disabled={!puzzle}>
                   Start Game
                 </button>
+                {ladder && (
+                  <div className="ladder-nav">
+                    <button onClick={() => moveToLadderLevel(ladder.index - 1)} disabled={ladder.index === 0}>
+                      Prev level
+                    </button>
+                    <button
+                      onClick={() => moveToLadderLevel(ladder.index + 1)}
+                      disabled={ladder.index >= ladder.puzzles.length - 1}
+                    >
+                      Next level
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -324,24 +829,34 @@ function App() {
             </div>
 
             <div className="solution">
-              <div className="solution__header">
-                <h3>Solution</h3>
-                <p className="hint">Drop tiles here; drag between tiles to insert and reorder.</p>
-                <div className="message-inline">
-                  {status === "solved" ? (
-                    <div className="victory-banner">
-                      <div className="victory-banner__content">
-                        <span className="victory-banner__emoji">*</span>
-                        <strong>Perfect Match!</strong>
+                <div className="solution__header">
+                  <h3>Solution</h3>
+                  <p className="hint">Drop tiles here; drag between tiles to insert and reorder.</p>
+                  <div className="message-inline">
+                    {status === "solved" ? (
+                      <div className="victory-banner">
+                        <div className="victory-banner__content">
+                          <span className="victory-banner__emoji">*</span>
+                          <strong>Perfect Match!</strong>
+                        </div>
                       </div>
-                    </div>
-                  ) : (
-                    <>
-                      {status === "unsolved" && <span className="badge warn big">Unsolvable</span>}
-                      {message && <strong>{message}</strong>}
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        {ladder && (
+                          <span className="badge neon">
+                            Ladder {ladder.index + 1}/{ladder.puzzles.length}
+                          </span>
+                        )}
+                        {!puzzle?.solvable && <span className="badge warn big">Unsolvable seed</span>}
+                        {puzzle?.settings.allowUnsolvable && puzzle.solvable && (
+                          <span className="badge warn">Unsolvable possible</span>
+                        )}
+                        {!puzzle?.settings.forceUnique && <span className="badge neon">Multiple answers</span>}
+                        {status === "unsolved" && <span className="badge warn big">Unsolvable</span>}
+                        {message && <strong>{message}</strong>}
+                      </>
+                    )}
+                  </div>
               </div>
               <div className="solution__slots" style={slotVars}>
                 {slots.length === 0 && (
