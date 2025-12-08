@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type CSSProperties, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 import {
   PRESETS,
   type AlphabetTheme,
@@ -222,12 +222,40 @@ function App() {
   const [showPanel, setShowPanel] = useState(true);
   const [showBrief, setShowBrief] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [hudCollapsed, setHudCollapsed] = useState(false);
+  const boardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (status !== "playing" || startTime === null) return;
     const id = setInterval(() => setElapsed(Date.now() - startTime), 250);
     return () => clearInterval(id);
   }, [status, startTime]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 700px)");
+    const apply = () => setIsMobile(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) {
+      setHudCollapsed(false);
+      return;
+    }
+    const boardEl = boardRef.current;
+    if (!boardEl) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => setHudCollapsed(entry.isIntersecting));
+      },
+      { threshold: 0.2 },
+    );
+    observer.observe(boardEl);
+    return () => observer.disconnect();
+  }, [isMobile]);
 
   const resetProgress = () => {
     setSlots([]);
@@ -507,6 +535,8 @@ function App() {
     }
   };
 
+  const toggleHud = () => setHudCollapsed((prev) => !prev);
+
   const slotCount = puzzle ? Math.max(slots.length || 1, puzzle.settings.tileCount) : Math.max(1, slots.length || 1);
   const slotVars: CSSProperties = {
     ["--slot-count" as string]: slotCount,
@@ -556,7 +586,7 @@ function App() {
         </section>
       )}
 
-      <section className="status-hud">
+      <section className={`status-hud ${isMobile && hudCollapsed ? "status-hud--compact" : ""}`}>
         <div className="hud-grid">
           <div className="hud-card">
             <span>Mode</span>
@@ -588,6 +618,11 @@ function App() {
           </div>
         </div>
         <div className="hud-actions">
+          {isMobile && (
+            <button className="ghost" onClick={toggleHud}>
+              {hudCollapsed ? "Show stats" : "Hide stats"}
+            </button>
+          )}
           <button className="ghost" onClick={handleGenerate}>
             Regenerate
           </button>
@@ -601,7 +636,46 @@ function App() {
       </section>
 
       <section className="setup-row">
-        {showPanel ? (
+        {isMobile ? (
+          <div className="mobile-setup">
+            <div className="mobile-setup__header">
+              <h3>Preset</h3>
+              <span className="field__hint">Custom controls available on desktop.</span>
+            </div>
+            <label className="field">
+              <span>Mode</span>
+              <select
+                value={preset}
+                onChange={(e) => {
+                  const nextPreset = e.target.value as PresetName;
+                  const nextDefaults = presetDefaults[nextPreset];
+                  setPreset(nextPreset);
+                  setKnobs(nextDefaults);
+                  setSeedInput("");
+                  setCopied(false);
+                  setPuzzle(null);
+                  setLadder(null);
+                  setSlots([]);
+                  setStatus("idle");
+                  setMessage(
+                    nextDefaults.allowUnsolvable
+                      ? "Generate a puzzle - this preset can include unsolvable seeds."
+                      : nextDefaults.forceUnique
+                        ? "Generate a puzzle to begin."
+                        : "Generate a puzzle with multiple possible answers.",
+                  );
+                }}
+              >
+                {Object.entries(presetLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="field__hint">Tiles will use these defaults. Adjust knobs on larger screens.</p>
+          </div>
+        ) : showPanel ? (
           <div className="setup-panel">
             <div className="setup-header">
               <h2>Control Deck</h2>
@@ -885,9 +959,10 @@ function App() {
         )}
       </section>
 
+
       {puzzle && (
         <main className="main">
-          <section className="board">
+          <section className="board" ref={boardRef}>
             <div className="tray">
               <div className="tray__header">
                 <h3>Available Tiles</h3>
