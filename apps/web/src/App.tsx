@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type KeyboardEvent } from "react";
 import {
   PRESETS,
   type AlphabetTheme,
@@ -15,6 +15,7 @@ type Status = "idle" | "playing" | "solved" | "unsolved";
 
 type DragState = {
   draggingId: string | null;
+  selectedId: string | null;
 };
 
 type KnobState = {
@@ -216,7 +217,7 @@ function App() {
   const [moves, setMoves] = useState(0);
   const [startTime, setStartTime] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
-  const [drag, setDrag] = useState<DragState>({ draggingId: null });
+  const [drag, setDrag] = useState<DragState>({ draggingId: null, selectedId: null });
   const [message, setMessage] = useState<string>("Generate a puzzle to begin.");
   const [showPanel, setShowPanel] = useState(true);
   const [showBrief, setShowBrief] = useState(true);
@@ -234,6 +235,7 @@ function App() {
     setMoves(0);
     setElapsed(0);
     setStartTime(null);
+    setDrag({ draggingId: null, selectedId: null });
   };
 
   const handleGenerate = () => {
@@ -258,10 +260,10 @@ function App() {
       !next.solvable
         ? "This seed is unsolvable."
         : next.settings.allowUnsolvable
-        ? "Press Start - this seed might be unsolvable."
+        ? "Press Start or drop a tile - this seed might be unsolvable."
         : next.settings.forceUnique
-          ? "Press Start to play."
-          : "Press Start - multiple solutions may exist.",
+          ? "Start or drop a tile to play."
+          : "Start or drop a tile - multiple solutions may exist.",
     );
     setSeedInput(formatSeedPayload(next.seed, effectivePreset, appliedKnobs));
     setCopied(false);
@@ -325,7 +327,7 @@ function App() {
         : firstPuzzle.settings.allowUnsolvable
           ? `Ladder level 1/${levels}. Might be unsolvable.`
           : firstPuzzle.settings.forceUnique
-            ? `Ladder level 1/${levels}. Press Start.`
+            ? `Ladder level 1/${levels}. Start or drop a tile.`
             : `Ladder level 1/${levels}. Multiple solutions allowed.`,
     );
     setSeedInput(formatSeedPayload(baseSeed, effectivePreset, settingsToKnobs(firstPuzzle.settings), levels));
@@ -340,8 +342,9 @@ function App() {
     setElapsed(0);
     setStartTime(Date.now());
     setStatus("playing");
+    setDrag({ draggingId: null, selectedId: null });
     if (!puzzle.solvable) {
-      setMessage("Explore the tiles — this seed is unsolvable.");
+      setMessage("Explore the tiles - this seed is unsolvable.");
     } else if (puzzle.settings.allowUnsolvable) {
       setMessage("Arrange the tiles below. Heads up: this seed might be impossible.");
     } else if (!puzzle.settings.forceUnique) {
@@ -364,8 +367,15 @@ function App() {
   };
 
   const placeTile = (targetIndex: number, mode: "insert" | "replace") => {
-    const currentId = drag.draggingId;
-    if (!currentId || !puzzle || status !== "playing") return;
+    const currentId = drag.draggingId ?? drag.selectedId;
+    if (!currentId || !puzzle) return;
+
+    if (status !== "playing") {
+      setStatus("playing");
+      if (startTime === null) {
+        setStartTime(Date.now());
+      }
+    }
 
     setSlots((prev) => {
       let next = [...prev];
@@ -385,12 +395,28 @@ function App() {
       return next;
     });
     setMoves((m) => m + 1);
-    setDrag({ draggingId: null });
-    setStatus("playing");
+    setDrag({ draggingId: null, selectedId: null });
   };
 
   const onDropInsert = (index: number) => placeTile(index, "insert");
   const onDropReplace = (index: number) => placeTile(index, "replace");
+
+  const handleTileSelect = (tileId: string) => {
+    if (!puzzle) return;
+    setDrag((prev) => ({ draggingId: null, selectedId: prev.selectedId === tileId ? null : tileId }));
+  };
+
+  const handleTileKeyDown = (event: KeyboardEvent<HTMLDivElement>, tileId: string) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    handleTileSelect(tileId);
+  };
+
+  const handleZoneKey = (event: KeyboardEvent<HTMLDivElement>, index: number, mode: "insert" | "replace") => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    placeTile(index, mode);
+  };
 
   useEffect(() => {
     if (!puzzle) return;
@@ -412,7 +438,7 @@ function App() {
         : nextPuzzle.settings.allowUnsolvable
           ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Might be unsolvable.`
           : nextPuzzle.settings.forceUnique
-            ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Press Start.`
+            ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Start or drop a tile.`
             : `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Multiple solutions allowed.`,
     );
     setSeedInput(
@@ -433,6 +459,7 @@ function App() {
       setMessage("This instance is unsolvable.");
     }
     setStartTime(null);
+    setDrag({ draggingId: null, selectedId: null });
   };
 
   const onClearSolution = () => {
@@ -440,6 +467,7 @@ function App() {
     setSlots([]);
     setMessage("Solution row cleared.");
     setStatus("playing");
+    setDrag({ draggingId: null, selectedId: null });
   };
 
   const onShareSeed = async () => {
@@ -470,6 +498,7 @@ function App() {
     setElapsed(0);
     setStartTime(null);
     setStatus("idle");
+    setDrag({ draggingId: null, selectedId: null });
     if (puzzle) {
       setSlots([]);
       setMessage("Stats reset. Ready when you are.");
@@ -482,6 +511,14 @@ function App() {
   const slotVars: CSSProperties = {
     ["--slot-count" as string]: slotCount,
   };
+  const activeTileCount = puzzle ? puzzle.settings.tileCount : knobs.tileCount;
+  const activeLengths = puzzle
+    ? `${puzzle.settings.minLength}-${puzzle.settings.maxLength}`
+    : `${knobs.minLength}-${knobs.maxLength}`;
+  const activeAlphabet = puzzle ? puzzle.settings.alphabet.length : knobs.alphabetSize;
+  const ladderLabel = ladder ? `${ladder.index + 1}/${ladder.puzzles.length}` : "Single";
+  const hasActiveTile = Boolean(drag.draggingId || drag.selectedId);
+  const selectedTile = puzzle?.tiles.find((tile) => tile.id === drag.selectedId);
 
   return (
     <div className="app">
@@ -518,6 +555,50 @@ function App() {
           </div>
         </section>
       )}
+
+      <section className="status-hud">
+        <div className="hud-grid">
+          <div className="hud-card">
+            <span>Mode</span>
+            <strong>{presetLabels[preset]}</strong>
+          </div>
+          <div className="hud-card">
+            <span>Tiles</span>
+            <strong>{activeTileCount}</strong>
+          </div>
+          <div className="hud-card">
+            <span>Lengths</span>
+            <strong>{activeLengths}</strong>
+          </div>
+          <div className="hud-card">
+            <span>Alphabet</span>
+            <strong>{activeAlphabet}</strong>
+          </div>
+          <div className="hud-card">
+            <span>Ladder</span>
+            <strong>{ladderLabel}</strong>
+          </div>
+          <div className="hud-card">
+            <span>Time</span>
+            <strong>{formatTime(elapsed)}</strong>
+          </div>
+          <div className="hud-card">
+            <span>Moves</span>
+            <strong>{moves}</strong>
+          </div>
+        </div>
+        <div className="hud-actions">
+          <button className="ghost" onClick={handleGenerate}>
+            Regenerate
+          </button>
+          <button className="primary" onClick={handleStart} disabled={!puzzle}>
+            Start
+          </button>
+          <button className="ghost" onClick={onResetStats}>
+            Reset
+          </button>
+        </div>
+      </section>
 
       <section className="setup-row">
         {showPanel ? (
@@ -812,26 +893,34 @@ function App() {
                 <h3>Available Tiles</h3>
               </div>
               <div className="tray__cards">
-                {puzzle.tiles.map((tile) => (
-                  <div
-                    key={tile.id}
-                    className="tile-card"
-                    draggable={status === "playing"}
-                    onDragStart={() => setDrag({ draggingId: tile.id })}
-                    onDragEnd={() => setDrag({ draggingId: null })}
-                  >
-                    <div className="tile-card__half tile-card__half--top">{tile.top}</div>
-                    <div className="tile-card__divider" />
-                    <div className="tile-card__half tile-card__half--bottom">{tile.bottom}</div>
-                  </div>
-                ))}
+                {puzzle.tiles.map((tile) => {
+                  const isActive = drag.draggingId === tile.id || drag.selectedId === tile.id;
+                  return (
+                    <div
+                      key={tile.id}
+                      className={`tile-card ${isActive ? "tile-card--active" : ""}`}
+                      draggable={Boolean(puzzle)}
+                      onDragStart={() => setDrag({ draggingId: tile.id, selectedId: tile.id })}
+                      onDragEnd={() => setDrag({ draggingId: null, selectedId: null })}
+                      onClick={() => handleTileSelect(tile.id)}
+                      onKeyDown={(event) => handleTileKeyDown(event, tile.id)}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={drag.selectedId === tile.id}
+                    >
+                      <div className="tile-card__half tile-card__half--top">{tile.top}</div>
+                      <div className="tile-card__divider" />
+                      <div className="tile-card__half tile-card__half--bottom">{tile.bottom}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="solution">
+            <div className={`solution ${hasActiveTile ? "solution--selecting" : ""}`}>
                 <div className="solution__header">
                   <h3>Solution</h3>
-                  <p className="hint">Drop tiles here; drag between tiles to insert and reorder.</p>
+                  <p className="hint">Drag or tap tiles to place; tap between tiles to insert or reorder.</p>
                   <div className="message-inline">
                     {status === "solved" ? (
                       <div className="victory-banner">
@@ -853,6 +942,11 @@ function App() {
                         )}
                         {!puzzle?.settings.forceUnique && <span className="badge neon">Multiple answers</span>}
                         {status === "unsolved" && <span className="badge warn big">Unsolvable</span>}
+                        {selectedTile && (
+                          <span className="badge neon selection-badge">
+                            Selected: {selectedTile.top}/{selectedTile.bottom}
+                          </span>
+                        )}
                         {message && <strong>{message}</strong>}
                       </>
                     )}
@@ -861,9 +955,17 @@ function App() {
               <div className="solution__slots" style={slotVars}>
                 {slots.length === 0 && (
                   <div
-                    className="solution__dropzone solution__dropzone--solo"
+                    className={`solution__dropzone solution__dropzone--solo ${hasActiveTile ? "solution__dropzone--active" : ""}`}
                     onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => onDropInsert(0)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      onDropInsert(0);
+                    }}
+                    onClick={() => onDropInsert(0)}
+                    onKeyDown={(event) => handleZoneKey(event, 0, "insert")}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Place the first tile"
                   >
                     <span className="sr-only">Place the first tile</span>
                   </div>
@@ -873,17 +975,33 @@ function App() {
                   return (
                     <Fragment key={`${id}-${idx}`}>
                       <div
-                        className="solution__dropzone"
+                        className={`solution__dropzone ${hasActiveTile ? "solution__dropzone--active" : ""}`}
                         onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => onDropInsert(idx)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          onDropInsert(idx);
+                        }}
+                        onClick={() => onDropInsert(idx)}
+                        onKeyDown={(event) => handleZoneKey(event, idx, "insert")}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Insert before slot ${idx + 1}`}
                       >
                         <span className="sr-only">Insert before slot {idx + 1}</span>
                       </div>
 
                       <div
-                        className="solution__slot"
+                        className={`solution__slot ${hasActiveTile ? "solution__slot--ready" : ""}`}
                         onDragOver={(e) => e.preventDefault()}
-                        onDrop={() => onDropReplace(idx)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          onDropReplace(idx);
+                        }}
+                        onClick={() => onDropReplace(idx)}
+                        onKeyDown={(event) => handleZoneKey(event, idx, "replace")}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Place in slot ${idx + 1}`}
                       >
                         <div className="slot__label">Slot {idx + 1}</div>
                         {tile ? (
@@ -899,9 +1017,17 @@ function App() {
 
                       {idx === slots.length - 1 && (
                         <div
-                          className="solution__dropzone"
+                          className={`solution__dropzone ${hasActiveTile ? "solution__dropzone--active" : ""}`}
                           onDragOver={(e) => e.preventDefault()}
-                          onDrop={() => onDropInsert(idx + 1)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            onDropInsert(idx + 1);
+                          }}
+                          onClick={() => onDropInsert(idx + 1)}
+                          onKeyDown={(event) => handleZoneKey(event, idx + 1, "insert")}
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`Insert after slot ${idx + 1}`}
                         >
                           <span className="sr-only">Insert after slot {idx + 1}</span>
                         </div>
