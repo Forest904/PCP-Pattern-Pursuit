@@ -1079,3 +1079,19 @@ button.start-button {
   opacity: 0;
   pointer-events: none;
 }
+
+.mobile-action-badge {
+  position: sticky;
+  top: 0.4rem;
+  align-self: flex-start;
+  margin-bottom: 0.25rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(124, 224, 255, 0.35);
+  background: rgba(5, 10, 20, 0.75);
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}

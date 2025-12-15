@@ -226,6 +226,7 @@ function App() {
   const [hudCollapsed, setHudCollapsed] = useState(false);
   const [mobileActionsHidden, setMobileActionsHidden] = useState(false);
   const [mobileStage, setMobileStage] = useState<"setup" | "play">("setup");
+  const [mobileActionsMinimized, setMobileActionsMinimized] = useState(false);
   const boardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -257,6 +258,7 @@ function App() {
       setHudCollapsed(false);
       setMobileActionsHidden(false);
       setMobileStage("setup");
+      setMobileActionsMinimized(false);
       return;
     }
     const boardEl = boardRef.current;
@@ -299,6 +301,7 @@ function App() {
     setMessage(getPuzzleMessage(nextPuzzle));
     if (isMobile) {
       setMobileStage("play");
+      setMobileActionsMinimized(false);
     }
   };
 
@@ -331,6 +334,7 @@ function App() {
     resetProgress();
     if (isMobile) {
       setMobileStage("play");
+      setMobileActionsMinimized(false);
     }
     setMessage(getPuzzleMessage(next));
     setSeedInput(formatSeedPayload(next.seed, effectivePreset, appliedKnobs));
@@ -391,6 +395,7 @@ function App() {
     resetProgress();
     if (isMobile) {
       setMobileStage("play");
+      setMobileActionsMinimized(false);
     }
     setMessage(
       !firstPuzzle.solvable
@@ -553,6 +558,7 @@ function App() {
     setDrag({ draggingId: null, selectedId: null });
     if (isMobile) {
       setMobileStage("setup");
+      setMobileActionsMinimized(false);
     }
     setMessage("Gave up. Adjust settings or regenerate to try again.");
   };
@@ -996,6 +1002,11 @@ function App() {
 
       {showBoard && (
         <main className="main">
+          {isMobile && mobileStage === "play" && mobileActionsMinimized && (
+            <button className="mobile-action-badge" onClick={() => setMobileActionsMinimized(false)}>
+              Show actions
+            </button>
+          )}
           <section className="board" ref={boardRef}>
             <div className="tray">
               <div className="tray__header">
@@ -1169,7 +1180,7 @@ function App() {
         </main>
       )}
 
-      {isMobile && mobileStage === "play" && (
+      {isMobile && mobileStage === "play" && !mobileActionsMinimized && (
         <div className={`mobile-action-bar ${mobileActionsHidden ? "mobile-action-bar--hidden" : ""}`} role="region" aria-label="Puzzle actions">
           <button className="primary" onClick={handleStart} disabled={!puzzle}>
             Start
@@ -1183,11 +1194,11 @@ function App() {
           <button className="ghost" onClick={onShowSolution} disabled={!puzzle}>
             Show
           </button>
-          <button className="ghost" onClick={onResetStats}>
-            Reset
-          </button>
           <button className="ghost warn" onClick={onGiveUp}>
             Give up
+          </button>
+          <button className="ghost" onClick={() => setMobileActionsMinimized(true)}>
+            Hide
           </button>
         </div>
       )}
