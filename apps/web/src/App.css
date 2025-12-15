@@ -710,6 +710,11 @@ button.start-button {
   color: #d4496f;
 }
 
+.ghost.warn {
+  border-color: rgba(255, 144, 166, 0.4);
+  color: #d4496f;
+}
+
 .badge.big {
   font-size: 1.05rem;
   padding: 0.45rem 0.7rem;

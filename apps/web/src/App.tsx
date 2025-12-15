@@ -225,6 +225,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(false);
   const [hudCollapsed, setHudCollapsed] = useState(false);
   const [mobileActionsHidden, setMobileActionsHidden] = useState(false);
+  const [mobileStage, setMobileStage] = useState<"setup" | "play">("setup");
   const boardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -244,6 +245,10 @@ function App() {
   useEffect(() => {
     if (isMobile) {
       setShowBrief(false);
+      setMobileStage((prev) => prev);
+    }
+    if (!isMobile) {
+      setMobileStage("setup");
     }
   }, [isMobile]);
 
@@ -251,6 +256,7 @@ function App() {
     if (!isMobile) {
       setHudCollapsed(false);
       setMobileActionsHidden(false);
+      setMobileStage("setup");
       return;
     }
     const boardEl = boardRef.current;
@@ -295,6 +301,9 @@ function App() {
     setPuzzle(next);
     setLadder(null);
     resetProgress();
+    if (isMobile) {
+      setMobileStage("play");
+    }
     setMessage(
       !next.solvable
         ? "This seed is unsolvable."
@@ -360,6 +369,9 @@ function App() {
     setKnobs(settingsToKnobs(firstPuzzle.settings));
     setPuzzle(firstPuzzle);
     resetProgress();
+    if (isMobile) {
+      setMobileStage("play");
+    }
     setMessage(
       !firstPuzzle.solvable
         ? `Ladder level 1/${levels} is unsolvable.`
@@ -402,6 +414,9 @@ function App() {
       setStatus("solved");
       setMessage("Matched!");
       setStartTime(null);
+      if (isMobile) {
+        setMobileStage("setup");
+      }
     }
   };
 
@@ -493,6 +508,9 @@ function App() {
       setSlots(solution.slice(0, puzzle.settings.tileCount));
       setStatus("solved");
       setMessage("Solution revealed.");
+      if (isMobile) {
+        setMobileStage("setup");
+      }
     } else {
       setStatus("unsolved");
       setMessage("This instance is unsolvable.");
@@ -507,6 +525,16 @@ function App() {
     setMessage("Solution row cleared.");
     setStatus("playing");
     setDrag({ draggingId: null, selectedId: null });
+  };
+
+  const onGiveUp = () => {
+    setStartTime(null);
+    setStatus("idle");
+    setDrag({ draggingId: null, selectedId: null });
+    if (isMobile) {
+      setMobileStage("setup");
+    }
+    setMessage("Gave up. Adjust settings or regenerate to try again.");
   };
 
   const onShareSeed = async () => {
@@ -563,418 +591,426 @@ function App() {
   const compactCards = isMobile && activeTileCount >= 7;
   const slotsFilled = slots.filter(Boolean).length;
   const solutionCapacity = puzzle ? puzzle.settings.tileCount : knobs.tileCount;
+  const showShell = !isMobile || mobileStage === "setup";
+  const showBoard = puzzle && (!isMobile || mobileStage === "play");
 
   return (
     <div className="app">
-      <header className="site-header">
-        <h1>
-          <span className="holo">PCP</span> Pattern Pursuit
-        </h1>
-        <p className="subtitle">
-          Drag domino-like tiles into order until the machine agrees: top string equals bottom string.
-        </p>
-      </header>
+      {showShell && (
+        <>
+          <header className="site-header">
+            <h1>
+              <span className="holo">PCP</span> Pattern Pursuit
+            </h1>
+            <p className="subtitle">
+              Drag domino-like tiles into order until the machine agrees: top string equals bottom string.
+            </p>
+          </header>
 
-      {showBrief ? (
-        <section className="rules">
-          <div className="rules__header">
-            <h3>Game Rules</h3>
-            <button className="ghost" onClick={() => setShowBrief(false)}>
-              Hide
-            </button>
-          </div>
-          <ul>
-            <li>Reuse tiles as needed to fill all the solution slots; slots can hold duplicates.</li>
-            <li>You win when the full top string equals the full bottom string.</li>
-            <li>The game ends automatically when you land on a matching stack; press Show to reveal if you get stuck.</li>
-          </ul>
-        </section>
-      ) : (
-        <section className="rules rules--placeholder">
-          <div className="rules__placeholder">
-            <span>Mission Brief</span>
-            <button className="ghost" onClick={() => setShowBrief(true)}>
-              Show
-            </button>
-          </div>
+          {showBrief ? (
+            <section className="rules">
+              <div className="rules__header">
+                <h3>Game Rules</h3>
+                <button className="ghost" onClick={() => setShowBrief(false)}>
+                  Hide
+                </button>
+              </div>
+              <ul>
+                <li>Reuse tiles as needed to fill all the solution slots; slots can hold duplicates.</li>
+                <li>You win when the full top string equals the full bottom string.</li>
+                <li>The game ends automatically when you land on a matching stack; press Show to reveal if you get stuck.</li>
+              </ul>
+            </section>
+          ) : (
+            <section className="rules rules--placeholder">
+              <div className="rules__placeholder">
+                <span>Mission Brief</span>
+                <button className="ghost" onClick={() => setShowBrief(true)}>
+                  Show
+                </button>
+              </div>
+            </section>
+          )}
+
+          <section className={`status-hud ${isMobile && hudCollapsed ? "status-hud--compact" : ""}`}>
+            <div className="hud-grid">
+              <div className="hud-card">
+                <span>Mode</span>
+                <strong>{presetLabels[preset]}</strong>
+              </div>
+              <div className="hud-card">
+                <span>Tiles</span>
+                <strong>{activeTileCount}</strong>
+              </div>
+              <div className="hud-card">
+                <span>Lengths</span>
+                <strong>{activeLengths}</strong>
+              </div>
+              <div className="hud-card">
+                <span>Alphabet</span>
+                <strong>{activeAlphabet}</strong>
+              </div>
+              <div className="hud-card">
+                <span>Ladder</span>
+                <strong>{ladderLabel}</strong>
+              </div>
+              <div className="hud-card">
+                <span>Time</span>
+                <strong>{formatTime(elapsed)}</strong>
+              </div>
+              <div className="hud-card">
+                <span>Moves</span>
+                <strong>{moves}</strong>
+              </div>
+            </div>
+            <div className="hud-actions">
+              {isMobile && (
+                <button className="ghost" onClick={toggleHud}>
+                  {hudCollapsed ? "Show stats" : "Hide stats"}
+                </button>
+              )}
+              <button className="ghost desktop-only" onClick={handleGenerate}>
+                Regenerate
+              </button>
+              <button className="primary desktop-only" onClick={handleStart} disabled={!puzzle}>
+                Start
+              </button>
+              <button className="ghost desktop-only" onClick={onResetStats}>
+                Reset
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+
+      {showShell && (
+        <section className="setup-row">
+          {isMobile ? (
+            <div className="mobile-setup">
+              <div className="mobile-setup__header">
+                <h3>Preset</h3>
+                <span className="field__hint">Custom controls available on desktop.</span>
+              </div>
+              <label className="field">
+                <span>Mode</span>
+                <select
+                  value={preset}
+                  onChange={(e) => {
+                    const nextPreset = e.target.value as PresetName;
+                    const nextDefaults = presetDefaults[nextPreset];
+                    setPreset(nextPreset);
+                    setKnobs(nextDefaults);
+                    setSeedInput("");
+                    setCopied(false);
+                    setPuzzle(null);
+                    setLadder(null);
+                    setSlots([]);
+                    setStatus("idle");
+                    setMessage(
+                      nextDefaults.allowUnsolvable
+                        ? "Generate a puzzle - this preset can include unsolvable seeds."
+                        : nextDefaults.forceUnique
+                          ? "Generate a puzzle to begin."
+                          : "Generate a puzzle with multiple possible answers.",
+                    );
+                  }}
+                >
+                  {Object.entries(presetLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="field__hint">Tiles will use these defaults. Adjust knobs on larger screens.</p>
+            </div>
+          ) : showPanel ? (
+            <div className="setup-panel">
+              <div className="setup-header">
+                <h2>Control Deck</h2>
+                <button className="ghost" onClick={() => setShowPanel(false)}>
+                  Hide
+                </button>
+              </div>
+              <div className="setup-columns">
+                <div className="panel-section setup-col setup-col--divider">
+                  <h3>Setup</h3>
+                  <label className="field">
+                    <span>Preset</span>
+                    <select
+                      value={preset}
+                      onChange={(e) => {
+                        const nextPreset = e.target.value as PresetName;
+                        const nextDefaults = presetDefaults[nextPreset];
+                        setPreset(nextPreset);
+                        setKnobs(nextDefaults);
+                        setSeedInput("");
+                        setCopied(false);
+                        setPuzzle(null);
+                        setLadder(null);
+                        setSlots([]);
+                        setStatus("idle");
+                        setMessage(
+                          nextDefaults.allowUnsolvable
+                            ? "Generate a puzzle - this preset can include unsolvable seeds."
+                            : nextDefaults.forceUnique
+                              ? "Generate a puzzle to begin."
+                              : "Generate a puzzle with multiple possible answers.",
+                        );
+                      }}
+                    >
+                      {Object.entries(presetLabels).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field seed-field">
+                    <span>Seed</span>
+                    <div className="seed-input-row">
+                      <input
+                        value={seedInput}
+                        onChange={(e) => {
+                          setSeedInput(e.target.value);
+                          setCopied(false);
+                        }}
+                        placeholder="seed or share code (blank = random)"
+                      />
+                      <button
+                        className={`seed-copy ${copied ? "copied" : ""}`}
+                        onClick={onShareSeed}
+                        disabled={!puzzle}
+                      >
+                        <span className="copy-icon"></span>
+                        <span>{copied ? "Copied" : "Copy"}</span>
+                      </button>
+                    </div>
+                  </label>
+                    <button onClick={handleGenerate} className="primary">
+                      Generate Tiles
+                    </button>
+                  </div>
+
+                  <div className="panel-section setup-col setup-col--divider">
+                    <h3>Generator knobs</h3>
+                    <div className="knob-grid">
+                      <label className="field">
+                        <span>Tile count</span>
+                        <input
+                          type="number"
+                          min={2}
+                          max={16}
+                          value={knobs.tileCount}
+                          onChange={(e) =>
+                            setKnobs((prev) =>
+                              normalizeKnobs({
+                                ...prev,
+                                tileCount: Number(e.target.value) || prev.tileCount,
+                              }),
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Alphabet size</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={26}
+                          value={knobs.alphabetSize}
+                          onChange={(e) =>
+                            setKnobs((prev) =>
+                              normalizeKnobs({
+                                ...prev,
+                                alphabetSize: Number(e.target.value) || prev.alphabetSize,
+                              }),
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Alphabet theme</span>
+                        <select
+                          value={knobs.theme}
+                          onChange={(e) =>
+                            setKnobs((prev) =>
+                              normalizeKnobs({
+                                ...prev,
+                                theme: e.target.value as AlphabetTheme,
+                              }),
+                            )
+                          }
+                        >
+                          <option value="preset">Preset/custom</option>
+                          <option value="binary">Binary only (0/1)</option>
+                          <option value="wide">Wide letters (5-6)</option>
+                        </select>
+                        <span className="field__hint">Switch feel without changing rules.</span>
+                      </label>
+                      <label className="field">
+                        <span>Min length</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={48}
+                          value={knobs.minLength}
+                          onChange={(e) =>
+                            setKnobs((prev) =>
+                              normalizeKnobs({
+                                ...prev,
+                                minLength: Number(e.target.value) || prev.minLength,
+                              }),
+                            )
+                          }
+                        />
+                      </label>
+                      <label className="field">
+                        <span>Max length</span>
+                        <input
+                          type="number"
+                          min={knobs.minLength}
+                          max={64}
+                          value={knobs.maxLength}
+                          onChange={(e) =>
+                            setKnobs((prev) =>
+                              normalizeKnobs({
+                                ...prev,
+                                maxLength: Number(e.target.value) || prev.maxLength,
+                              }),
+                            )
+                          }
+                        />
+                      </label>
+                    </div>
+                    <div className="toggle-grid">
+                      <label className="checkbox-field">
+                        <input
+                          type="checkbox"
+                          checked={knobs.allowUnsolvable}
+                          onChange={(e) => setKnobs((prev) => ({ ...prev, allowUnsolvable: e.target.checked }))}
+                        />
+                        <div className="checkbox-field__copy">
+                          <strong>Allow unsolvable seeds</strong>
+                          <span className="field__hint">About a 40% chance when enabled.</span>
+                        </div>
+                      </label>
+                      <label className="checkbox-field">
+                        <input
+                          type="checkbox"
+                          checked={!knobs.forceUnique}
+                          onChange={(e) => setKnobs((prev) => ({ ...prev, forceUnique: !e.target.checked }))}
+                        />
+                        <div className="checkbox-field__copy">
+                          <strong>Allow multiple solutions</strong>
+                          <span className="field__hint">Enabled by default on Tricky.</span>
+                        </div>
+                      </label>
+                    </div>
+                    <div className="ladder-row">
+                      <label className="field">
+                        <span>Ladder levels</span>
+                        <input
+                          type="number"
+                          min={2}
+                          max={10}
+                          value={ladderLevels}
+                          onChange={(e) => setLadderLevels(Math.max(2, Math.min(10, Number(e.target.value) || ladderLevels)))}
+                        />
+                        <span className="field__hint">Builds a seed lineage that bumps lengths/alphabet each step.</span>
+                      </label>
+                      <button className="ghost ladder-button" onClick={() => handleGenerateLadder()}>
+                        Generate ladder
+                      </button>
+                    </div>
+                    <p className="field__hint">Knob choices are embedded in the seed/share text.</p>
+                  </div>
+
+                  <div className="panel-section setup-col">
+                    <h3>Statistics</h3>
+                    <div className="stat-row">
+                      <span>Mode</span>
+                      <strong>{presetLabels[preset]}</strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Tiles</span>
+                      <strong>{puzzle ? puzzle.settings.tileCount : knobs.tileCount}</strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Lengths</span>
+                      <strong>
+                        {puzzle
+                          ? `${puzzle.settings.minLength}-${puzzle.settings.maxLength}`
+                          : `${knobs.minLength}-${knobs.maxLength}`}
+                      </strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Alphabet</span>
+                      <strong>{puzzle ? puzzle.settings.alphabet.length : knobs.alphabetSize}</strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Solutions</span>
+                      <strong>
+                        {puzzle
+                          ? puzzle.settings.forceUnique
+                            ? "Unique"
+                            : "Multiple"
+                          : knobs.forceUnique
+                            ? "Unique"
+                            : "Multiple"}
+                      </strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Alphabet theme</span>
+                      <strong>{puzzle ? puzzle.settings.theme ?? "preset" : knobs.theme}</strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Ladder</span>
+                      <strong>{ladder ? `${ladder.index + 1}/${ladder.puzzles.length}` : "Single"}</strong>
+                    </div>
+                    <div className="stat-row">
+                      <span>Time</span>
+                      <strong>{formatTime(elapsed)}</strong>
+                    </div>
+                  <div className="stat-row">
+                    <span>Moves</span>
+                    <strong>{moves}</strong>
+                  </div>
+                  <button className="ghost" onClick={onResetStats}>
+                    Reset
+                  </button>
+                  <button className="start-button" onClick={handleStart} disabled={!puzzle}>
+                    Start Game
+                  </button>
+                  {ladder && (
+                    <div className="ladder-nav">
+                      <button onClick={() => moveToLadderLevel(ladder.index - 1)} disabled={ladder.index === 0}>
+                        Prev level
+                      </button>
+                      <button
+                        onClick={() => moveToLadderLevel(ladder.index + 1)}
+                        disabled={ladder.index >= ladder.puzzles.length - 1}
+                      >
+                        Next level
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="setup-placeholder">
+              <span>Control Deck hidden</span>
+              <button className="ghost" onClick={() => setShowPanel(true)}>
+                Show
+              </button>
+            </div>
+          )}
         </section>
       )}
 
-      <section className={`status-hud ${isMobile && hudCollapsed ? "status-hud--compact" : ""}`}>
-        <div className="hud-grid">
-          <div className="hud-card">
-            <span>Mode</span>
-            <strong>{presetLabels[preset]}</strong>
-          </div>
-          <div className="hud-card">
-            <span>Tiles</span>
-            <strong>{activeTileCount}</strong>
-          </div>
-          <div className="hud-card">
-            <span>Lengths</span>
-            <strong>{activeLengths}</strong>
-          </div>
-          <div className="hud-card">
-            <span>Alphabet</span>
-            <strong>{activeAlphabet}</strong>
-          </div>
-          <div className="hud-card">
-            <span>Ladder</span>
-            <strong>{ladderLabel}</strong>
-          </div>
-          <div className="hud-card">
-            <span>Time</span>
-            <strong>{formatTime(elapsed)}</strong>
-          </div>
-          <div className="hud-card">
-            <span>Moves</span>
-            <strong>{moves}</strong>
-          </div>
-        </div>
-        <div className="hud-actions">
-          {isMobile && (
-            <button className="ghost" onClick={toggleHud}>
-              {hudCollapsed ? "Show stats" : "Hide stats"}
-            </button>
-          )}
-          <button className="ghost desktop-only" onClick={handleGenerate}>
-            Regenerate
-          </button>
-          <button className="primary desktop-only" onClick={handleStart} disabled={!puzzle}>
-            Start
-          </button>
-          <button className="ghost desktop-only" onClick={onResetStats}>
-            Reset
-          </button>
-        </div>
-      </section>
 
-      <section className="setup-row">
-        {isMobile ? (
-          <div className="mobile-setup">
-            <div className="mobile-setup__header">
-              <h3>Preset</h3>
-              <span className="field__hint">Custom controls available on desktop.</span>
-            </div>
-            <label className="field">
-              <span>Mode</span>
-              <select
-                value={preset}
-                onChange={(e) => {
-                  const nextPreset = e.target.value as PresetName;
-                  const nextDefaults = presetDefaults[nextPreset];
-                  setPreset(nextPreset);
-                  setKnobs(nextDefaults);
-                  setSeedInput("");
-                  setCopied(false);
-                  setPuzzle(null);
-                  setLadder(null);
-                  setSlots([]);
-                  setStatus("idle");
-                  setMessage(
-                    nextDefaults.allowUnsolvable
-                      ? "Generate a puzzle - this preset can include unsolvable seeds."
-                      : nextDefaults.forceUnique
-                        ? "Generate a puzzle to begin."
-                        : "Generate a puzzle with multiple possible answers.",
-                  );
-                }}
-              >
-                {Object.entries(presetLabels).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="field__hint">Tiles will use these defaults. Adjust knobs on larger screens.</p>
-          </div>
-        ) : showPanel ? (
-          <div className="setup-panel">
-            <div className="setup-header">
-              <h2>Control Deck</h2>
-              <button className="ghost" onClick={() => setShowPanel(false)}>
-                Hide
-              </button>
-            </div>
-            <div className="setup-columns">
-              <div className="panel-section setup-col setup-col--divider">
-                <h3>Setup</h3>
-                <label className="field">
-                  <span>Preset</span>
-                  <select
-                    value={preset}
-                    onChange={(e) => {
-                      const nextPreset = e.target.value as PresetName;
-                      const nextDefaults = presetDefaults[nextPreset];
-                      setPreset(nextPreset);
-                      setKnobs(nextDefaults);
-                      setSeedInput("");
-                      setCopied(false);
-                      setPuzzle(null);
-                      setLadder(null);
-                      setSlots([]);
-                      setStatus("idle");
-                      setMessage(
-                        nextDefaults.allowUnsolvable
-                          ? "Generate a puzzle - this preset can include unsolvable seeds."
-                          : nextDefaults.forceUnique
-                            ? "Generate a puzzle to begin."
-                            : "Generate a puzzle with multiple possible answers.",
-                      );
-                    }}
-                  >
-                    {Object.entries(presetLabels).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="field seed-field">
-                  <span>Seed</span>
-                  <div className="seed-input-row">
-                    <input
-                      value={seedInput}
-                      onChange={(e) => {
-                        setSeedInput(e.target.value);
-                        setCopied(false);
-                      }}
-                      placeholder="seed or share code (blank = random)"
-                    />
-                    <button
-                      className={`seed-copy ${copied ? "copied" : ""}`}
-                      onClick={onShareSeed}
-                      disabled={!puzzle}
-                    >
-                      <span className="copy-icon"></span>
-                      <span>{copied ? "Copied" : "Copy"}</span>
-                    </button>
-                  </div>
-                </label>
-                  <button onClick={handleGenerate} className="primary">
-                    Generate Tiles
-                  </button>
-                </div>
-
-                <div className="panel-section setup-col setup-col--divider">
-                  <h3>Generator knobs</h3>
-                  <div className="knob-grid">
-                    <label className="field">
-                      <span>Tile count</span>
-                      <input
-                        type="number"
-                        min={2}
-                        max={16}
-                        value={knobs.tileCount}
-                        onChange={(e) =>
-                          setKnobs((prev) =>
-                            normalizeKnobs({
-                              ...prev,
-                              tileCount: Number(e.target.value) || prev.tileCount,
-                            }),
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Alphabet size</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={26}
-                        value={knobs.alphabetSize}
-                        onChange={(e) =>
-                          setKnobs((prev) =>
-                            normalizeKnobs({
-                              ...prev,
-                              alphabetSize: Number(e.target.value) || prev.alphabetSize,
-                            }),
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Alphabet theme</span>
-                      <select
-                        value={knobs.theme}
-                        onChange={(e) =>
-                          setKnobs((prev) =>
-                            normalizeKnobs({
-                              ...prev,
-                              theme: e.target.value as AlphabetTheme,
-                            }),
-                          )
-                        }
-                      >
-                        <option value="preset">Preset/custom</option>
-                        <option value="binary">Binary only (0/1)</option>
-                        <option value="wide">Wide letters (5-6)</option>
-                      </select>
-                      <span className="field__hint">Switch feel without changing rules.</span>
-                    </label>
-                    <label className="field">
-                      <span>Min length</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={48}
-                        value={knobs.minLength}
-                        onChange={(e) =>
-                          setKnobs((prev) =>
-                            normalizeKnobs({
-                              ...prev,
-                              minLength: Number(e.target.value) || prev.minLength,
-                            }),
-                          )
-                        }
-                      />
-                    </label>
-                    <label className="field">
-                      <span>Max length</span>
-                      <input
-                        type="number"
-                        min={knobs.minLength}
-                        max={64}
-                        value={knobs.maxLength}
-                        onChange={(e) =>
-                          setKnobs((prev) =>
-                            normalizeKnobs({
-                              ...prev,
-                              maxLength: Number(e.target.value) || prev.maxLength,
-                            }),
-                          )
-                        }
-                      />
-                    </label>
-                  </div>
-                  <div className="toggle-grid">
-                    <label className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={knobs.allowUnsolvable}
-                        onChange={(e) => setKnobs((prev) => ({ ...prev, allowUnsolvable: e.target.checked }))}
-                      />
-                      <div className="checkbox-field__copy">
-                        <strong>Allow unsolvable seeds</strong>
-                        <span className="field__hint">About a 40% chance when enabled.</span>
-                      </div>
-                    </label>
-                    <label className="checkbox-field">
-                      <input
-                        type="checkbox"
-                        checked={!knobs.forceUnique}
-                        onChange={(e) => setKnobs((prev) => ({ ...prev, forceUnique: !e.target.checked }))}
-                      />
-                      <div className="checkbox-field__copy">
-                        <strong>Allow multiple solutions</strong>
-                        <span className="field__hint">Enabled by default on Tricky.</span>
-                      </div>
-                    </label>
-                  </div>
-                  <div className="ladder-row">
-                    <label className="field">
-                      <span>Ladder levels</span>
-                      <input
-                        type="number"
-                        min={2}
-                        max={10}
-                        value={ladderLevels}
-                        onChange={(e) => setLadderLevels(Math.max(2, Math.min(10, Number(e.target.value) || ladderLevels)))}
-                      />
-                      <span className="field__hint">Builds a seed lineage that bumps lengths/alphabet each step.</span>
-                    </label>
-                    <button className="ghost ladder-button" onClick={() => handleGenerateLadder()}>
-                      Generate ladder
-                    </button>
-                  </div>
-                  <p className="field__hint">Knob choices are embedded in the seed/share text.</p>
-                </div>
-
-                <div className="panel-section setup-col">
-                  <h3>Statistics</h3>
-                  <div className="stat-row">
-                    <span>Mode</span>
-                    <strong>{presetLabels[preset]}</strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Tiles</span>
-                    <strong>{puzzle ? puzzle.settings.tileCount : knobs.tileCount}</strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Lengths</span>
-                    <strong>
-                      {puzzle
-                        ? `${puzzle.settings.minLength}-${puzzle.settings.maxLength}`
-                        : `${knobs.minLength}-${knobs.maxLength}`}
-                    </strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Alphabet</span>
-                    <strong>{puzzle ? puzzle.settings.alphabet.length : knobs.alphabetSize}</strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Solutions</span>
-                    <strong>
-                      {puzzle
-                        ? puzzle.settings.forceUnique
-                          ? "Unique"
-                          : "Multiple"
-                        : knobs.forceUnique
-                          ? "Unique"
-                          : "Multiple"}
-                    </strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Alphabet theme</span>
-                    <strong>{puzzle ? puzzle.settings.theme ?? "preset" : knobs.theme}</strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Ladder</span>
-                    <strong>{ladder ? `${ladder.index + 1}/${ladder.puzzles.length}` : "Single"}</strong>
-                  </div>
-                  <div className="stat-row">
-                    <span>Time</span>
-                    <strong>{formatTime(elapsed)}</strong>
-                  </div>
-                <div className="stat-row">
-                  <span>Moves</span>
-                  <strong>{moves}</strong>
-                </div>
-                <button className="ghost" onClick={onResetStats}>
-                  Reset
-                </button>
-                <button className="start-button" onClick={handleStart} disabled={!puzzle}>
-                  Start Game
-                </button>
-                {ladder && (
-                  <div className="ladder-nav">
-                    <button onClick={() => moveToLadderLevel(ladder.index - 1)} disabled={ladder.index === 0}>
-                      Prev level
-                    </button>
-                    <button
-                      onClick={() => moveToLadderLevel(ladder.index + 1)}
-                      disabled={ladder.index >= ladder.puzzles.length - 1}
-                    >
-                      Next level
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="setup-placeholder">
-            <span>Control Deck hidden</span>
-            <button className="ghost" onClick={() => setShowPanel(true)}>
-              Show
-            </button>
-          </div>
-        )}
-      </section>
-
-
-      {puzzle && (
+      {showBoard && (
         <main className="main">
           <section className="board" ref={boardRef}>
             <div className="tray">
@@ -1149,7 +1185,7 @@ function App() {
         </main>
       )}
 
-      {isMobile && (
+      {isMobile && mobileStage === "play" && (
         <div className={`mobile-action-bar ${mobileActionsHidden ? "mobile-action-bar--hidden" : ""}`} role="region" aria-label="Puzzle actions">
           <button className="primary" onClick={handleStart} disabled={!puzzle}>
             Start
@@ -1165,6 +1201,9 @@ function App() {
           </button>
           <button className="ghost" onClick={onResetStats}>
             Reset
+          </button>
+          <button className="ghost warn" onClick={onGiveUp}>
+            Give up
           </button>
         </div>
       )}
