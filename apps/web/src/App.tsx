@@ -224,6 +224,7 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [hudCollapsed, setHudCollapsed] = useState(false);
+  const [mobileActionsHidden, setMobileActionsHidden] = useState(false);
   const boardRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -249,13 +250,17 @@ function App() {
   useEffect(() => {
     if (!isMobile) {
       setHudCollapsed(false);
+      setMobileActionsHidden(false);
       return;
     }
     const boardEl = boardRef.current;
     if (!boardEl) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => setHudCollapsed(entry.isIntersecting));
+        entries.forEach((entry) => {
+          setHudCollapsed(entry.isIntersecting);
+          setMobileActionsHidden(entry.isIntersecting);
+        });
       },
       { threshold: 0.2 },
     );
@@ -1145,7 +1150,7 @@ function App() {
       )}
 
       {isMobile && (
-        <div className="mobile-action-bar" role="region" aria-label="Puzzle actions">
+        <div className={`mobile-action-bar ${mobileActionsHidden ? "mobile-action-bar--hidden" : ""}`} role="region" aria-label="Puzzle actions">
           <button className="primary" onClick={handleStart} disabled={!puzzle}>
             Start
           </button>
