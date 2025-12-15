@@ -241,6 +241,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (isMobile) {
+      setShowBrief(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
     if (!isMobile) {
       setHudCollapsed(false);
       return;
@@ -549,6 +555,9 @@ function App() {
   const ladderLabel = ladder ? `${ladder.index + 1}/${ladder.puzzles.length}` : "Single";
   const hasActiveTile = Boolean(drag.draggingId || drag.selectedId);
   const selectedTile = puzzle?.tiles.find((tile) => tile.id === drag.selectedId);
+  const compactCards = isMobile && activeTileCount >= 7;
+  const slotsFilled = slots.filter(Boolean).length;
+  const solutionCapacity = puzzle ? puzzle.settings.tileCount : knobs.tileCount;
 
   return (
     <div className="app">
@@ -623,13 +632,13 @@ function App() {
               {hudCollapsed ? "Show stats" : "Hide stats"}
             </button>
           )}
-          <button className="ghost" onClick={handleGenerate}>
+          <button className="ghost desktop-only" onClick={handleGenerate}>
             Regenerate
           </button>
-          <button className="primary" onClick={handleStart} disabled={!puzzle}>
+          <button className="primary desktop-only" onClick={handleStart} disabled={!puzzle}>
             Start
           </button>
-          <button className="ghost" onClick={onResetStats}>
+          <button className="ghost desktop-only" onClick={onResetStats}>
             Reset
           </button>
         </div>
@@ -973,7 +982,7 @@ function App() {
                   return (
                     <div
                       key={tile.id}
-                      className={`tile-card ${isActive ? "tile-card--active" : ""}`}
+                      className={`tile-card ${isActive ? "tile-card--active" : ""} ${compactCards ? "tile-card--compact" : ""}`}
                       draggable={Boolean(puzzle)}
                       onDragStart={() => setDrag({ draggingId: tile.id, selectedId: tile.id })}
                       onDragEnd={() => setDrag({ draggingId: null, selectedId: null })}
@@ -1026,6 +1035,16 @@ function App() {
                       </>
                     )}
                   </div>
+                  {isMobile && (
+                    <div className="solution__summary">
+                      <span className="badge neon">Slots {slotsFilled}/{solutionCapacity}</span>
+                      {selectedTile && (
+                        <span className="badge neon selection-badge selection-badge--compact">
+                          {selectedTile.top}/{selectedTile.bottom}
+                        </span>
+                      )}
+                    </div>
+                  )}
               </div>
               <div className="solution__slots" style={slotVars}>
                 {slots.length === 0 && (
@@ -1080,7 +1099,7 @@ function App() {
                       >
                         <div className="slot__label">Slot {idx + 1}</div>
                         {tile ? (
-                          <div className="tile-card tile-card--small">
+                          <div className={`tile-card tile-card--small ${compactCards ? "tile-card--compact" : ""}`}>
                             <div className="tile-card__half tile-card__half--top">{tile.top}</div>
                             <div className="tile-card__divider" />
                             <div className="tile-card__half tile-card__half--bottom">{tile.bottom}</div>
@@ -1123,6 +1142,26 @@ function App() {
             </div>
           </section>
         </main>
+      )}
+
+      {isMobile && (
+        <div className="mobile-action-bar" role="region" aria-label="Puzzle actions">
+          <button className="primary" onClick={handleStart} disabled={!puzzle}>
+            Start
+          </button>
+          <button className="ghost" onClick={handleGenerate}>
+            Regenerate
+          </button>
+          <button className="ghost" onClick={onClearSolution} disabled={!puzzle}>
+            Clear row
+          </button>
+          <button className="ghost" onClick={onShowSolution} disabled={!puzzle}>
+            Show
+          </button>
+          <button className="ghost" onClick={onResetStats}>
+            Reset
+          </button>
+        </div>
       )}
     </div>
   );
