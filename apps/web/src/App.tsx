@@ -274,6 +274,34 @@ function App() {
     return () => observer.disconnect();
   }, [isMobile]);
 
+  const getPuzzleMessage = (next: PuzzleInstance) => {
+    if (!next.solvable) return "This seed is unsolvable.";
+    if (next.settings.allowUnsolvable) return "Press Start or drop a tile - this seed might be unsolvable.";
+    if (next.settings.forceUnique) return "Start or drop a tile to play.";
+    return "Start or drop a tile - multiple solutions may exist.";
+  };
+
+  const handlePresetChange = (nextPreset: PresetName) => {
+    const nextDefaults = presetDefaults[nextPreset];
+    const nextPuzzle = generatePuzzle({
+      preset: nextPreset,
+      seed: undefined,
+      overrides: knobsToOverrides(nextDefaults),
+    });
+    const appliedKnobs = settingsToKnobs(nextPuzzle.settings);
+    setPreset(nextPreset);
+    setKnobs(appliedKnobs);
+    setSeedInput(formatSeedPayload(nextPuzzle.seed, nextPreset, appliedKnobs));
+    setCopied(false);
+    setPuzzle(nextPuzzle);
+    setLadder(null);
+    resetProgress();
+    setMessage(getPuzzleMessage(nextPuzzle));
+    if (isMobile) {
+      setMobileStage("play");
+    }
+  };
+
   const resetProgress = () => {
     setSlots([]);
     setStatus("idle");
@@ -304,15 +332,7 @@ function App() {
     if (isMobile) {
       setMobileStage("play");
     }
-    setMessage(
-      !next.solvable
-        ? "This seed is unsolvable."
-        : next.settings.allowUnsolvable
-        ? "Press Start or drop a tile - this seed might be unsolvable."
-        : next.settings.forceUnique
-          ? "Start or drop a tile to play."
-          : "Start or drop a tile - multiple solutions may exist.",
-    );
+    setMessage(getPuzzleMessage(next));
     setSeedInput(formatSeedPayload(next.seed, effectivePreset, appliedKnobs));
     setCopied(false);
   };
@@ -695,25 +715,7 @@ function App() {
                 <span>Mode</span>
                 <select
                   value={preset}
-                  onChange={(e) => {
-                    const nextPreset = e.target.value as PresetName;
-                    const nextDefaults = presetDefaults[nextPreset];
-                    setPreset(nextPreset);
-                    setKnobs(nextDefaults);
-                    setSeedInput("");
-                    setCopied(false);
-                    setPuzzle(null);
-                    setLadder(null);
-                    setSlots([]);
-                    setStatus("idle");
-                    setMessage(
-                      nextDefaults.allowUnsolvable
-                        ? "Generate a puzzle - this preset can include unsolvable seeds."
-                        : nextDefaults.forceUnique
-                          ? "Generate a puzzle to begin."
-                          : "Generate a puzzle with multiple possible answers.",
-                    );
-                  }}
+                  onChange={(e) => handlePresetChange(e.target.value as PresetName)}
                 >
                   {Object.entries(presetLabels).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -735,30 +737,12 @@ function App() {
               <div className="setup-columns">
                 <div className="panel-section setup-col setup-col--divider">
                   <h3>Setup</h3>
-                  <label className="field">
-                    <span>Preset</span>
-                    <select
-                      value={preset}
-                      onChange={(e) => {
-                        const nextPreset = e.target.value as PresetName;
-                        const nextDefaults = presetDefaults[nextPreset];
-                        setPreset(nextPreset);
-                        setKnobs(nextDefaults);
-                        setSeedInput("");
-                        setCopied(false);
-                        setPuzzle(null);
-                        setLadder(null);
-                        setSlots([]);
-                        setStatus("idle");
-                        setMessage(
-                          nextDefaults.allowUnsolvable
-                            ? "Generate a puzzle - this preset can include unsolvable seeds."
-                            : nextDefaults.forceUnique
-                              ? "Generate a puzzle to begin."
-                              : "Generate a puzzle with multiple possible answers.",
-                        );
-                      }}
-                    >
+                <label className="field">
+                  <span>Preset</span>
+                  <select
+                    value={preset}
+                    onChange={(e) => handlePresetChange(e.target.value as PresetName)}
+                  >
                       {Object.entries(presetLabels).map(([value, label]) => (
                         <option key={value} value={value}>
                           {label}
