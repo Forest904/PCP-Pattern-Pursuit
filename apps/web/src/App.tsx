@@ -602,10 +602,6 @@ function App() {
 
   const toggleHud = () => setHudCollapsed((prev) => !prev);
 
-  const slotCount = puzzle ? Math.max(slots.length || 1, puzzle.settings.tileCount) : Math.max(1, slots.length || 1);
-  const slotVars: CSSProperties = {
-    ["--slot-count" as string]: slotCount,
-  };
   const activeTileCount = puzzle ? puzzle.settings.tileCount : knobs.tileCount;
   const activeLengths = puzzle
     ? `${puzzle.settings.minLength}-${puzzle.settings.maxLength}`
@@ -620,6 +616,21 @@ function App() {
   const showShell = !isMobile || mobileStage === "setup";
   const showBoard = puzzle && (!isMobile || mobileStage === "play");
   const presetLabel = preset ? presetLabels[preset] : "Select mode";
+  const slotCount = puzzle ? Math.max(slots.length || 1, puzzle.settings.tileCount) : Math.max(1, slots.length || 1);
+  const slotVars: CSSProperties = {
+    ["--slot-count" as string]: slotCount,
+  };
+  const trayVars: CSSProperties = isMobile
+    ? {
+        ["--tile-count" as string]: activeTileCount || 1,
+      }
+    : {};
+  const solutionVars: CSSProperties = isMobile
+    ? {
+        ...slotVars,
+        ["--tile-count" as string]: solutionCapacity || 1,
+      }
+    : slotVars;
 
   return (
     <div className="app">
@@ -1037,7 +1048,7 @@ function App() {
               <div className="tray__header">
                 <h3>Available Tiles</h3>
               </div>
-              <div className="tray__cards">
+              <div className="tray__cards" style={trayVars}>
                 {puzzle.tiles.map((tile) => {
                   const isActive = drag.draggingId === tile.id || drag.selectedId === tile.id;
                   return (
@@ -1107,7 +1118,7 @@ function App() {
                     </div>
                   )}
               </div>
-              <div className="solution__slots" style={slotVars}>
+              <div className="solution__slots" style={solutionVars}>
                 {slots.length === 0 && (
                   <div
                     className={`solution__dropzone solution__dropzone--solo ${hasActiveTile ? "solution__dropzone--active" : ""}`}

@@ -970,43 +970,50 @@ button.start-button {
   }
 
   .tray__cards {
-    grid-template-columns: repeat(auto-fit, minmax(clamp(120px, 30vw, 170px), 1fr));
-    overflow: visible;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: 1fr;
+    grid-auto-columns: minmax(clamp(70px, calc((100vw - 36px) / var(--tile-count, 1)), 150px), 1fr);
+    overflow: hidden;
+    align-items: stretch;
   }
 
   .tile-card {
-    height: clamp(135px, 34vw, 175px);
+    height: clamp(120px, 28vw, 160px);
   }
 
   .tile-card--compact {
-    height: clamp(115px, 30vw, 155px);
+    height: clamp(105px, 24vw, 145px);
   }
 
   .tile-card--small {
-    height: clamp(125px, 32vw, 160px);
+    height: clamp(110px, 26vw, 150px);
   }
 
   .tile-card--compact.tile-card--small {
-    height: clamp(110px, 28vw, 140px);
+    height: clamp(100px, 22vw, 130px);
   }
 
   .solution__slots {
-    flex-wrap: wrap;
-    overflow: visible;
-    gap: 0.55rem;
+    display: grid;
+    grid-auto-flow: column;
+    grid-template-rows: 1fr;
+    grid-auto-columns: minmax(clamp(110px, calc((100vw - 32px) / var(--tile-count, 1)), 200px), 1fr);
+    gap: 0.5rem;
+    overflow: hidden;
     scroll-snap-type: none;
   }
 
   .solution__slot {
-    min-width: clamp(140px, 46vw, 200px);
-    flex: 1 1 clamp(140px, 46vw, 200px);
-    min-height: clamp(130px, 42vw, 200px);
+    min-width: auto;
+    flex: 1 1 auto;
+    min-height: clamp(120px, 34vw, 190px);
   }
 
   .solution__dropzone {
-    min-width: clamp(12px, 8vw, 32px);
-    flex: 1 1 clamp(12px, 8vw, 32px);
-    min-height: clamp(110px, 24vw, 160px);
+    min-width: clamp(6px, 4vw, 20px);
+    flex: 0 0 clamp(6px, 4vw, 20px);
+    min-height: clamp(100px, 22vw, 150px);
   }
 
   .solution__dropzone--solo {
