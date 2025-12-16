@@ -224,11 +224,12 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [hudCollapsed, setHudCollapsed] = useState(false);
-  const [mobileActionsHidden, setMobileActionsHidden] = useState(false);
   const [mobileStage, setMobileStage] = useState<"setup" | "play">("setup");
-  const [mobileActionsMinimized, setMobileActionsMinimized] = useState(false);
+  const [mobileSetupView, setMobileSetupView] = useState<"rules" | "preset">("rules");
   const [showConfetti, setShowConfetti] = useState(false);
   const boardRef = useRef<HTMLElement | null>(null);
+  const rulesRef = useRef<HTMLElement | null>(null);
+  const presetRef = useRef<HTMLElement | null>(null);
   const winTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -248,19 +249,18 @@ function App() {
   useEffect(() => {
     if (isMobile) {
       setShowBrief(false);
-      setMobileStage((prev) => prev);
+      setMobileStage("setup");
     }
     if (!isMobile) {
       setMobileStage("setup");
+      setMobileSetupView("rules");
     }
   }, [isMobile]);
 
   useEffect(() => {
     if (!isMobile) {
       setHudCollapsed(false);
-      setMobileActionsHidden(false);
       setMobileStage("setup");
-      setMobileActionsMinimized(false);
       return;
     }
     const boardEl = boardRef.current;
@@ -269,13 +269,35 @@ function App() {
       (entries) => {
         entries.forEach((entry) => {
           setHudCollapsed(entry.isIntersecting);
-          setMobileActionsHidden(entry.isIntersecting);
         });
       },
       { threshold: 0.2 },
     );
     observer.observe(boardEl);
     return () => observer.disconnect();
+  }, [isMobile, puzzle, mobileStage]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const rulesEl = rulesRef.current;
+    const presetEl = presetRef.current;
+    const options = { threshold: 0.5 };
+    const rulesObserver = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setMobileSetupView("rules");
+      }
+    }, options);
+    const presetObserver = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setMobileSetupView("preset");
+      }
+    }, options);
+    if (rulesEl) rulesObserver.observe(rulesEl);
+    if (presetEl) presetObserver.observe(presetEl);
+    return () => {
+      rulesObserver.disconnect();
+      presetObserver.disconnect();
+    };
   }, [isMobile]);
 
   useEffect(() => {
@@ -325,7 +347,6 @@ function App() {
     setMessage(getPuzzleMessage(nextPuzzle));
     if (isMobile) {
       setMobileStage("play");
-      setMobileActionsMinimized(true);
     }
   };
 
@@ -364,7 +385,6 @@ function App() {
     setShowConfetti(false);
     if (isMobile) {
       setMobileStage("play");
-      setMobileActionsMinimized(true);
     }
     setMessage(getPuzzleMessage(next));
     setSeedInput(formatSeedPayload(next.seed, effectivePreset, appliedKnobs));
@@ -426,7 +446,6 @@ function App() {
     setShowConfetti(false);
     if (isMobile) {
       setMobileStage("play");
-      setMobileActionsMinimized(true);
     }
     setMessage(
       !firstPuzzle.solvable
@@ -585,7 +604,6 @@ function App() {
     setDrag({ draggingId: null, selectedId: null });
     if (isMobile) {
       setMobileStage("setup");
-      setMobileActionsMinimized(false);
     }
     setMessage("Gave up. Adjust settings or regenerate to try again.");
   };
@@ -640,7 +658,7 @@ function App() {
   const compactCards = isMobile && activeTileCount >= 7;
   const slotsFilled = slots.filter(Boolean).length;
   const solutionCapacity = puzzle ? puzzle.settings.tileCount : knobs.tileCount;
-  const showShell = !isMobile || mobileStage === "setup";
+  const showShell = true;
   const showBoard = puzzle && (!isMobile || mobileStage === "play");
   const presetLabel = preset ? presetLabels[preset] : "Select mode";
   const showFirstDropHint = puzzle && slots.length === 0 && status !== "solved";
@@ -680,30 +698,35 @@ function App() {
             </p>
           </header>
 
-          {showBrief ? (
-            <section className="rules">
-              <div className="rules__header">
-                <h3>Game Rules</h3>
-                <button className="ghost" onClick={() => setShowBrief(false)}>
-                  Hide
-                </button>
-              </div>
-              <ul>
-                <li>Reuse tiles as needed to fill all the solution slots; slots can hold duplicates.</li>
-                <li>You win when the full top string equals the full bottom string.</li>
-                <li>The game ends automatically when you land on a matching stack; press Show to reveal if you get stuck.</li>
-              </ul>
-            </section>
-          ) : (
-            <section className="rules rules--placeholder">
+          <section
+            ref={rulesRef}
+            className={`rules ${!showBrief ? "rules--placeholder" : ""} ${isMobile ? "mobile-panel" : ""} ${
+              isMobile && mobileSetupView !== "rules" ? "mobile-panel--hidden" : ""
+            }`}
+          >
+            {showBrief ? (
+              <>
+                <div className="rules__header">
+                  <h3>Game Rules</h3>
+                  <button className="ghost" onClick={() => setShowBrief(false)}>
+                    Hide
+                  </button>
+                </div>
+                <ul>
+                  <li>Reuse tiles as needed to fill all the solution slots; slots can hold duplicates.</li>
+                  <li>You win when the full top string equals the full bottom string.</li>
+                  <li>The game ends automatically when you land on a matching stack; press Show to reveal if you get stuck.</li>
+                </ul>
+              </>
+            ) : (
               <div className="rules__placeholder">
                 <span>Mission Brief</span>
                 <button className="ghost" onClick={() => setShowBrief(true)}>
                   Show
                 </button>
               </div>
-            </section>
-          )}
+            )}
+          </section>
 
           <section className={`status-hud ${isMobile && hudCollapsed ? "status-hud--compact" : ""}`}>
             <div className="hud-grid">
@@ -759,7 +782,12 @@ function App() {
       {showShell && (
         <section className="setup-row">
           {isMobile ? (
-            <div className="mobile-setup">
+            <div
+              ref={presetRef}
+              className={`mobile-setup ${isMobile ? "mobile-panel" : ""} ${
+                isMobile && mobileSetupView !== "preset" ? "mobile-panel--hidden" : ""
+              }`}
+            >
               <div className="mobile-setup__header">
                 <h3>Preset</h3>
                 <span className="field__hint">Custom controls available on desktop.</span>
@@ -1073,12 +1101,26 @@ function App() {
 
       {showBoard && (
         <main className="main">
-          {isMobile && mobileStage === "play" && mobileActionsMinimized && (
-            <button className="mobile-action-badge" onClick={() => setMobileActionsMinimized(false)}>
-              Show actions
-            </button>
-          )}
           <section className="board" ref={boardRef}>
+            {isMobile && (
+              <div className="mobile-actions-inline" role="region" aria-label="Puzzle actions">
+                <button className="primary" onClick={handleStart} disabled={!puzzle}>
+                  Start
+                </button>
+                <button className="ghost" onClick={handleGenerate}>
+                  Regenerate
+                </button>
+                <button className="ghost" onClick={onClearSolution} disabled={!puzzle}>
+                  Clear row
+                </button>
+                <button className="ghost" onClick={onShowSolution} disabled={!puzzle}>
+                  Show
+                </button>
+                <button className="ghost warn" onClick={onGiveUp}>
+                  Give up
+                </button>
+              </div>
+            )}
             <div className="tray">
               <div className="tray__header">
                 <h3>Available Tiles</h3>
@@ -1108,11 +1150,24 @@ function App() {
               </div>
             </div>
 
+            {isMobile && (
+              <div className="play-instructions">
+                <p className="hint">Tap a tile, then tap a slot or gap to place or reorder.</p>
+                {showFirstDropHint && <p className="hint hint--placement">Tap near an edge to insert a tile.</p>}
+              </div>
+            )}
+
             <div className={`solution ${hasActiveTile ? "solution--selecting" : ""}`}>
                 <div className="solution__header">
                   <h3>Solution</h3>
-                  <p className="hint">Drag or tap tiles to place; tap between tiles to insert or reorder.</p>
-                  {showFirstDropHint && <p className="hint hint--placement">Select a tile, then tap left or right to place it.</p>}
+                  {!isMobile && (
+                    <>
+                      <p className="hint">Drag or tap tiles to place; tap between tiles to insert or reorder.</p>
+                      {showFirstDropHint && (
+                        <p className="hint hint--placement">Select a tile, then tap left or right to place it.</p>
+                      )}
+                    </>
+                  )}
                   <div className="message-inline">
                     {status === "solved" ? (
                       <div className="victory-banner">
@@ -1252,28 +1307,6 @@ function App() {
         </main>
       )}
 
-      {isMobile && mobileStage === "play" && !mobileActionsMinimized && (
-        <div className={`mobile-action-bar ${mobileActionsHidden ? "mobile-action-bar--hidden" : ""}`} role="region" aria-label="Puzzle actions">
-          <button className="primary" onClick={handleStart} disabled={!puzzle}>
-            Start
-          </button>
-          <button className="ghost" onClick={handleGenerate}>
-            Regenerate
-          </button>
-          <button className="ghost" onClick={onClearSolution} disabled={!puzzle}>
-            Clear row
-          </button>
-          <button className="ghost" onClick={onShowSolution} disabled={!puzzle}>
-            Show
-          </button>
-          <button className="ghost warn" onClick={onGiveUp}>
-            Give up
-          </button>
-          <button className="ghost" onClick={() => setMobileActionsMinimized(true)}>
-            Hide
-          </button>
-        </div>
-      )}
     </div>
   );
 }
