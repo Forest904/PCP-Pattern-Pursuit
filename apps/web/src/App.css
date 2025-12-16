@@ -1099,27 +1099,49 @@ button.start-button {
     flex-wrap: nowrap;
     gap: 0.35rem;
     width: 100%;
-    overflow: hidden;
-    scroll-snap-type: none;
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
   }
 
   .solution__slot {
-    flex: 0 0 calc((100% - (var(--tile-count, 1) - 1) * 0.35rem) / var(--tile-count, 1));
-    min-width: 68px;
+    flex: 0 0 calc((100% - (var(--slot-count, 1) - 1) * 0.35rem) / var(--slot-count, 1));
+    min-width: 0;
     max-width: 170px;
     min-height: clamp(110px, 30vw, 170px);
     aspect-ratio: 2 / 3;
   }
 
   .solution__dropzone {
-    min-width: clamp(48px, 18vw, 120px);
-    flex: 1 1 clamp(48px, 18vw, 120px);
+    display: none;
+    min-width: 0;
+    max-width: 0;
+    flex: 0 0 0;
     min-height: clamp(110px, 30vw, 170px);
+    padding: 0;
+    margin: 0;
     opacity: 0;
   }
 
-  .solution__dropzone--solo {
+  .solution--selecting .solution__dropzone,
+  .solution__dropzone--active {
+    display: flex;
+    min-width: clamp(32px, 10vw, 70px);
+    max-width: clamp(32px, 10vw, 70px);
+    flex-basis: clamp(32px, 10vw, 70px);
+    padding: 0.2rem;
+    opacity: 0.5;
+  }
+
+  .solution__dropzone--solo,
+  .solution--selecting .solution__dropzone--solo,
+  .solution__dropzone--solo.solution__dropzone--active {
+    display: flex;
     min-width: clamp(200px, 90vw, 240px);
+    max-width: clamp(200px, 90vw, 240px);
+    flex: 1 1 auto;
+    opacity: 0.85;
   }
 
   .message-inline {
