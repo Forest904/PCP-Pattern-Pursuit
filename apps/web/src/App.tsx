@@ -227,9 +227,9 @@ function App() {
   const [mobileStage, setMobileStage] = useState<"setup" | "play">("setup");
   const [mobileSetupView, setMobileSetupView] = useState<"rules" | "preset">("rules");
   const [showConfetti, setShowConfetti] = useState(false);
-  const boardRef = useRef<HTMLElement | null>(null);
+  const boardRef = useRef<HTMLDivElement | null>(null);
   const rulesRef = useRef<HTMLElement | null>(null);
-  const presetRef = useRef<HTMLElement | null>(null);
+  const presetRef = useRef<HTMLDivElement | null>(null);
   const winTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
