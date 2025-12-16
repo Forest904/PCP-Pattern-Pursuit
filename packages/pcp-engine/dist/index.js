@@ -24,21 +24,12 @@ export const PRESETS = {
         allowUnsolvable: false,
         forceUnique: true,
     },
-    tricky: {
+    custom: {
         tileCount: 6,
-        alphabet: ALPHABET_POOL.slice(0, 3),
+        alphabet: ALPHABET_POOL.slice(0, 4),
         minLength: 2,
-        maxLength: 4,
+        maxLength: 5,
         allowUnsolvable: false,
-        forceUnique: false,
-    },
-    expert: {
-        tileCount: 9,
-        tileCountRange: [8, 10],
-        alphabet: ALPHABET_POOL.slice(0, 5),
-        minLength: 4,
-        maxLength: 7,
-        allowUnsolvable: true,
         forceUnique: true,
     },
 };

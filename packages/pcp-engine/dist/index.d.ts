@@ -1,4 +1,4 @@
-export type PresetName = "easy" | "medium" | "hard" | "tricky" | "expert";
+export type PresetName = "easy" | "medium" | "hard" | "custom";
 export type Tile = {
     id: string;
     top: string;

@@ -677,10 +677,6 @@ button.ghost {
   box-shadow: none;
 }
 
-button.start-button {
-  margin-top: 0.5rem;
-}
-
 .stat-row {
   display: flex;
   justify-content: space-between;
@@ -858,6 +854,79 @@ button.start-button {
   }
   100% {
     transform: translate3d(6px, 110vh, 0) rotate(300deg);
+    opacity: 0;
+  }
+}
+
+.fail-rain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 29;
+}
+
+.fail-rain__piece {
+  position: absolute;
+  top: -12%;
+  width: 10px;
+  height: 18px;
+  border-radius: 3px;
+  opacity: 0.9;
+  animation: fail-fall 1.05s ease-in forwards;
+}
+
+.fail-rain__piece--1 {
+  background: #ff6b6b;
+}
+
+.fail-rain__piece--2 {
+  background: #ffa94d;
+}
+
+.fail-rain__piece--3 {
+  background: #6c7a89;
+}
+
+.fail-rain__piece:nth-child(odd) {
+  width: 9px;
+  height: 16px;
+}
+
+.fail-rain__piece:nth-child(3n) {
+  animation-duration: 1.2s;
+}
+
+.fail-rain__piece:nth-child(4n) {
+  animation-duration: 0.95s;
+}
+
+.fail-rain__piece:nth-child(1) { left: 8%; animation-delay: 0s; }
+.fail-rain__piece:nth-child(2) { left: 15%; animation-delay: 0.05s; }
+.fail-rain__piece:nth-child(3) { left: 22%; animation-delay: 0.1s; }
+.fail-rain__piece:nth-child(4) { left: 30%; animation-delay: 0.14s; }
+.fail-rain__piece:nth-child(5) { left: 38%; animation-delay: 0.07s; }
+.fail-rain__piece:nth-child(6) { left: 46%; animation-delay: 0.03s; }
+.fail-rain__piece:nth-child(7) { left: 54%; animation-delay: 0.12s; }
+.fail-rain__piece:nth-child(8) { left: 62%; animation-delay: 0.04s; }
+.fail-rain__piece:nth-child(9) { left: 70%; animation-delay: 0.09s; }
+.fail-rain__piece:nth-child(10) { left: 78%; animation-delay: 0.06s; }
+.fail-rain__piece:nth-child(11) { left: 86%; animation-delay: 0.11s; }
+.fail-rain__piece:nth-child(12) { left: 94%; animation-delay: 0.02s; }
+.fail-rain__piece:nth-child(13) { left: 18%; animation-delay: 0.08s; }
+.fail-rain__piece:nth-child(14) { left: 42%; animation-delay: 0.05s; }
+.fail-rain__piece:nth-child(15) { left: 68%; animation-delay: 0.1s; }
+.fail-rain__piece:nth-child(16) { left: 88%; animation-delay: 0.13s; }
+
+@keyframes fail-fall {
+  0% {
+    transform: translateY(-8vh) rotate(-6deg);
+  }
+  60% {
+    transform: translateY(65vh) rotate(8deg);
+  }
+  100% {
+    transform: translateY(110vh) rotate(14deg);
     opacity: 0;
   }
 }

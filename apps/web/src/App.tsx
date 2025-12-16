@@ -41,11 +41,10 @@ const presetLabels: Record<PresetName, string> = {
   easy: "Easy",
   medium: "Medium",
   hard: "Hard",
-  tricky: "Tricky",
-  expert: "Expert/Marathon",
+  custom: "Custom",
 };
 
-const presetOrder: PresetName[] = ["easy", "medium", "hard", "tricky", "expert"];
+const presetOrder: PresetName[] = ["easy", "medium", "hard", "custom"];
 
 const normalizeKnobs = (value: KnobState): KnobState => {
   const minLength = Math.min(48, Math.max(1, Math.round(value.minLength)));
@@ -227,10 +226,12 @@ function App() {
   const [mobileStage, setMobileStage] = useState<"setup" | "play">("setup");
   const [mobileSetupView, setMobileSetupView] = useState<"rules" | "preset">("rules");
   const [showConfetti, setShowConfetti] = useState(false);
+  const [showFail, setShowFail] = useState(false);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const rulesRef = useRef<HTMLElement | null>(null);
   const presetRef = useRef<HTMLDivElement | null>(null);
   const winTimeoutRef = useRef<number | null>(null);
+  const failTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (status !== "playing" || startTime === null) return;
@@ -302,31 +303,37 @@ function App() {
 
   useEffect(() => {
     return () => {
-      if (winTimeoutRef.current) {
-        window.clearTimeout(winTimeoutRef.current);
-      }
+      clearBurstTimers();
     };
   }, []);
 
   const getPuzzleMessage = (next: PuzzleInstance) => {
     if (!next.solvable) return "This seed is unsolvable.";
-    if (next.settings.allowUnsolvable) return "Press Start or drop a tile - this seed might be unsolvable.";
-    if (next.settings.forceUnique) return "Start or drop a tile to play.";
-    return "Start or drop a tile - multiple solutions may exist.";
+    if (next.settings.allowUnsolvable) return "Drop a tile to begin - this seed might be unsolvable.";
+    if (next.settings.forceUnique) return "Drop a tile to play.";
+    return "Drop tiles - multiple solutions may exist.";
   };
 
   const triggerWinCelebration = () => {
     if (winTimeoutRef.current) {
       window.clearTimeout(winTimeoutRef.current);
     }
+    setShowFail(false);
     setShowConfetti(true);
     const id = window.setTimeout(() => {
       setShowConfetti(false);
-      if (isMobile) {
-        setMobileStage("setup");
-      }
     }, 1500);
     winTimeoutRef.current = id;
+  };
+
+  const triggerFailAnimation = () => {
+    if (failTimeoutRef.current) {
+      window.clearTimeout(failTimeoutRef.current);
+    }
+    setShowConfetti(false);
+    setShowFail(true);
+    const id = window.setTimeout(() => setShowFail(false), 1200);
+    failTimeoutRef.current = id;
   };
 
   const handlePresetChange = (nextPreset: PresetName) => {
@@ -350,30 +357,42 @@ function App() {
     }
   };
 
-  const resetProgress = () => {
+  const clearBurstTimers = () => {
     if (winTimeoutRef.current) {
       window.clearTimeout(winTimeoutRef.current);
       winTimeoutRef.current = null;
     }
+    if (failTimeoutRef.current) {
+      window.clearTimeout(failTimeoutRef.current);
+      failTimeoutRef.current = null;
+    }
+  };
+
+  const resetProgress = (message?: string) => {
+    clearBurstTimers();
     setShowConfetti(false);
+    setShowFail(false);
     setSlots([]);
     setStatus("idle");
     setMoves(0);
     setElapsed(0);
     setStartTime(null);
     setDrag({ draggingId: null, selectedId: null });
+    if (message) {
+      setMessage(message);
+    }
   };
 
-  const handleGenerate = () => {
-    const parsed = parseSeedPayload(seedInput);
-    if (parsed.ladderLevels && parsed.ladderLevels > 1) {
+  const handleGenerate = (options?: { ignoreSeed?: boolean }) => {
+    const parsed = options?.ignoreSeed ? {} : parseSeedPayload(seedInput);
+    if (!options?.ignoreSeed && parsed.ladderLevels && parsed.ladderLevels > 1) {
       handleGenerateLadder(parsed.ladderLevels, parsed);
       return;
     }
     const { preset: effectivePreset, knobs: mergedKnobs } = resolvePresetAndKnobs(parsed, preset, knobs);
     const next = generatePuzzle({
       preset: effectivePreset,
-      seed: parsed.seed || undefined,
+      seed: options?.ignoreSeed ? undefined : parsed.seed || undefined,
       overrides: knobsToOverrides(mergedKnobs),
     });
     const appliedKnobs = settingsToKnobs(next.settings);
@@ -453,31 +472,12 @@ function App() {
         : firstPuzzle.settings.allowUnsolvable
           ? `Ladder level 1/${levels}. Might be unsolvable.`
           : firstPuzzle.settings.forceUnique
-            ? `Ladder level 1/${levels}. Start or drop a tile.`
+            ? `Ladder level 1/${levels}. Drop a tile to play.`
             : `Ladder level 1/${levels}. Multiple solutions allowed.`,
     );
     setSeedInput(formatSeedPayload(baseSeed, effectivePreset, settingsToKnobs(firstPuzzle.settings), levels));
     setCopied(false);
     setLadderLevels(levels);
-  };
-
-  const handleStart = () => {
-    if (!puzzle) return;
-    setSlots([]);
-    setMoves(0);
-    setElapsed(0);
-    setStartTime(Date.now());
-    setStatus("playing");
-    setDrag({ draggingId: null, selectedId: null });
-    if (!puzzle.solvable) {
-      setMessage("Explore the tiles - this seed is unsolvable.");
-    } else if (puzzle.settings.allowUnsolvable) {
-      setMessage("Arrange the tiles below. Heads up: this seed might be impossible.");
-    } else if (!puzzle.settings.forceUnique) {
-      setMessage("Arrange the tiles - multiple valid solutions are allowed.");
-    } else {
-      setMessage("Arrange the tiles below.");
-    }
   };
 
   const evaluateWin = (nextSlots: string[]) => {
@@ -565,7 +565,7 @@ function App() {
         : nextPuzzle.settings.allowUnsolvable
           ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Might be unsolvable.`
           : nextPuzzle.settings.forceUnique
-            ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Start or drop a tile.`
+            ? `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Drop a tile to play.`
             : `Ladder level ${clamped + 1}/${ladder.puzzles.length}. Multiple solutions allowed.`,
     );
     setSeedInput(
@@ -592,20 +592,12 @@ function App() {
 
   const onClearSolution = () => {
     if (!puzzle) return;
-    setSlots([]);
-    setMessage("Solution row cleared.");
-    setStatus("playing");
-    setDrag({ draggingId: null, selectedId: null });
+    resetProgress("Solution row cleared.");
   };
 
   const onGiveUp = () => {
-    setStartTime(null);
-    setStatus("idle");
-    setDrag({ draggingId: null, selectedId: null });
-    if (isMobile) {
-      setMobileStage("setup");
-    }
-    setMessage("Gave up. Adjust settings or regenerate to try again.");
+    resetProgress("Gave up. Adjust settings or regenerate to try again.");
+    triggerFailAnimation();
   };
 
   const onShareSeed = async () => {
@@ -632,17 +624,7 @@ function App() {
   }, [copied]);
 
   const onResetStats = () => {
-    setMoves(0);
-    setElapsed(0);
-    setStartTime(null);
-    setStatus("idle");
-    setDrag({ draggingId: null, selectedId: null });
-    if (puzzle) {
-      setSlots([]);
-      setMessage("Stats reset. Ready when you are.");
-    } else {
-      setMessage("Stats reset. Generate a puzzle to start.");
-    }
+    resetProgress(puzzle ? "Stats reset. Ready when you are." : "Stats reset. Generate a puzzle to start.");
   };
 
   const toggleHud = () => setHudCollapsed((prev) => !prev);
@@ -661,6 +643,7 @@ function App() {
   const showShell = true;
   const showBoard = puzzle && (!isMobile || mobileStage === "play");
   const presetLabel = preset ? presetLabels[preset] : "Select mode";
+  const isCustom = preset === "custom";
   const showFirstDropHint = puzzle && slots.length === 0 && status !== "solved";
   const slotCount = puzzle ? Math.max(slots.length || 1, puzzle.settings.tileCount) : Math.max(1, slots.length || 1);
   const slotVars: CSSProperties = {
@@ -684,6 +667,13 @@ function App() {
         <div className="confetti" aria-hidden="true">
           {Array.from({ length: 18 }).map((_, idx) => (
             <span key={idx} className={`confetti__piece confetti__piece--${(idx % 4) + 1}`} />
+          ))}
+        </div>
+      )}
+      {showFail && (
+        <div className="fail-rain" aria-hidden="true">
+          {Array.from({ length: 16 }).map((_, idx) => (
+            <span key={idx} className={`fail-rain__piece fail-rain__piece--${(idx % 3) + 1}`} />
           ))}
         </div>
       )}
@@ -765,11 +755,8 @@ function App() {
                   {hudCollapsed ? "Show stats" : "Hide stats"}
                 </button>
               )}
-              <button className="ghost desktop-only" onClick={handleGenerate}>
+              <button className="ghost desktop-only" onClick={() => handleGenerate({ ignoreSeed: true })}>
                 Regenerate
-              </button>
-              <button className="primary desktop-only" onClick={handleStart} disabled={!puzzle}>
-                Start
               </button>
               <button className="ghost desktop-only" onClick={onResetStats}>
                 Reset
@@ -876,143 +863,151 @@ function App() {
                       </button>
                     </div>
                   </label>
-                    <button onClick={handleGenerate} className="primary">
+                    <button onClick={() => handleGenerate()} className="primary">
                       Generate Tiles
                     </button>
                   </div>
 
                   <div className="panel-section setup-col setup-col--divider">
                     <h3>Generator knobs</h3>
-                    <div className="knob-grid">
-                      <label className="field">
-                        <span>Tile count</span>
-                        <input
-                          type="number"
-                          min={2}
-                          max={16}
-                          value={knobs.tileCount}
-                          onChange={(e) =>
-                            setKnobs((prev) =>
-                              normalizeKnobs({
-                                ...prev,
-                                tileCount: Number(e.target.value) || prev.tileCount,
-                              }),
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Alphabet size</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={26}
-                          value={knobs.alphabetSize}
-                          onChange={(e) =>
-                            setKnobs((prev) =>
-                              normalizeKnobs({
-                                ...prev,
-                                alphabetSize: Number(e.target.value) || prev.alphabetSize,
-                              }),
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Alphabet theme</span>
-                        <select
-                          value={knobs.theme}
-                          onChange={(e) =>
-                            setKnobs((prev) =>
-                              normalizeKnobs({
-                                ...prev,
-                                theme: e.target.value as AlphabetTheme,
-                              }),
-                            )
-                          }
-                        >
-                          <option value="preset">Preset/custom</option>
-                          <option value="binary">Binary only (0/1)</option>
-                          <option value="wide">Wide letters (5-6)</option>
-                        </select>
-                        <span className="field__hint">Switch feel without changing rules.</span>
-                      </label>
-                      <label className="field">
-                        <span>Min length</span>
-                        <input
-                          type="number"
-                          min={1}
-                          max={48}
-                          value={knobs.minLength}
-                          onChange={(e) =>
-                            setKnobs((prev) =>
-                              normalizeKnobs({
-                                ...prev,
-                                minLength: Number(e.target.value) || prev.minLength,
-                              }),
-                            )
-                          }
-                        />
-                      </label>
-                      <label className="field">
-                        <span>Max length</span>
-                        <input
-                          type="number"
-                          min={knobs.minLength}
-                          max={64}
-                          value={knobs.maxLength}
-                          onChange={(e) =>
-                            setKnobs((prev) =>
-                              normalizeKnobs({
-                                ...prev,
-                                maxLength: Number(e.target.value) || prev.maxLength,
-                              }),
-                            )
-                          }
-                        />
-                      </label>
-                    </div>
-                    <div className="toggle-grid">
-                      <label className="checkbox-field">
-                        <input
-                          type="checkbox"
-                          checked={knobs.allowUnsolvable}
-                          onChange={(e) => setKnobs((prev) => ({ ...prev, allowUnsolvable: e.target.checked }))}
-                        />
-                        <div className="checkbox-field__copy">
-                          <strong>Allow unsolvable seeds</strong>
-                          <span className="field__hint">About a 40% chance when enabled.</span>
+                    {isCustom ? (
+                      <>
+                        <div className="knob-grid">
+                          <label className="field">
+                            <span>Tile count</span>
+                            <input
+                              type="number"
+                              min={2}
+                              max={16}
+                              value={knobs.tileCount}
+                              onChange={(e) =>
+                                setKnobs((prev) =>
+                                  normalizeKnobs({
+                                    ...prev,
+                                    tileCount: Number(e.target.value) || prev.tileCount,
+                                  }),
+                                )
+                              }
+                            />
+                          </label>
+                          <label className="field">
+                            <span>Alphabet size</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={26}
+                              value={knobs.alphabetSize}
+                              onChange={(e) =>
+                                setKnobs((prev) =>
+                                  normalizeKnobs({
+                                    ...prev,
+                                    alphabetSize: Number(e.target.value) || prev.alphabetSize,
+                                  }),
+                                )
+                              }
+                            />
+                          </label>
+                          <label className="field">
+                            <span>Alphabet theme</span>
+                            <select
+                              value={knobs.theme}
+                              onChange={(e) =>
+                                setKnobs((prev) =>
+                                  normalizeKnobs({
+                                    ...prev,
+                                    theme: e.target.value as AlphabetTheme,
+                                  }),
+                                )
+                              }
+                            >
+                              <option value="preset">Preset/custom</option>
+                              <option value="binary">Binary only (0/1)</option>
+                              <option value="wide">Wide letters (5-6)</option>
+                            </select>
+                            <span className="field__hint">Switch feel without changing rules.</span>
+                          </label>
+                          <label className="field">
+                            <span>Min length</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={48}
+                              value={knobs.minLength}
+                              onChange={(e) =>
+                                setKnobs((prev) =>
+                                  normalizeKnobs({
+                                    ...prev,
+                                    minLength: Number(e.target.value) || prev.minLength,
+                                  }),
+                                )
+                              }
+                            />
+                          </label>
+                          <label className="field">
+                            <span>Max length</span>
+                            <input
+                              type="number"
+                              min={knobs.minLength}
+                              max={64}
+                              value={knobs.maxLength}
+                              onChange={(e) =>
+                                setKnobs((prev) =>
+                                  normalizeKnobs({
+                                    ...prev,
+                                    maxLength: Number(e.target.value) || prev.maxLength,
+                                  }),
+                                )
+                              }
+                            />
+                          </label>
                         </div>
-                      </label>
-                      <label className="checkbox-field">
-                        <input
-                          type="checkbox"
-                          checked={!knobs.forceUnique}
-                          onChange={(e) => setKnobs((prev) => ({ ...prev, forceUnique: !e.target.checked }))}
-                        />
-                        <div className="checkbox-field__copy">
-                          <strong>Allow multiple solutions</strong>
-                          <span className="field__hint">Enabled by default on Tricky.</span>
+                        <div className="toggle-grid">
+                          <label className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={knobs.allowUnsolvable}
+                              onChange={(e) => setKnobs((prev) => ({ ...prev, allowUnsolvable: e.target.checked }))}
+                            />
+                            <div className="checkbox-field__copy">
+                              <strong>Allow unsolvable seeds</strong>
+                              <span className="field__hint">About a 40% chance when enabled.</span>
+                            </div>
+                          </label>
+                          <label className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={!knobs.forceUnique}
+                              onChange={(e) => setKnobs((prev) => ({ ...prev, forceUnique: !e.target.checked }))}
+                            />
+                            <div className="checkbox-field__copy">
+                              <strong>Allow multiple solutions</strong>
+                              <span className="field__hint">Available in Custom preset.</span>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                    </div>
-                    <div className="ladder-row">
-                      <label className="field">
-                        <span>Ladder levels</span>
-                        <input
-                          type="number"
-                          min={2}
-                          max={10}
-                          value={ladderLevels}
-                          onChange={(e) => setLadderLevels(Math.max(2, Math.min(10, Number(e.target.value) || ladderLevels)))}
-                        />
-                        <span className="field__hint">Builds a seed lineage that bumps lengths/alphabet each step.</span>
-                      </label>
-                      <button className="ghost ladder-button" onClick={() => handleGenerateLadder()}>
-                        Generate ladder
-                      </button>
-                    </div>
-                    <p className="field__hint">Knob choices are embedded in the seed/share text.</p>
+                        <div className="ladder-row">
+                          <label className="field">
+                            <span>Ladder levels</span>
+                            <input
+                              type="number"
+                              min={2}
+                              max={10}
+                              value={ladderLevels}
+                              onChange={(e) =>
+                                setLadderLevels(Math.max(2, Math.min(10, Number(e.target.value) || ladderLevels)))
+                              }
+                            />
+                            <span className="field__hint">Builds a seed lineage that bumps lengths/alphabet each step.</span>
+                          </label>
+                          <button className="ghost ladder-button" onClick={() => handleGenerateLadder()}>
+                            Generate ladder
+                          </button>
+                        </div>
+                        <p className="field__hint">Knob choices are embedded in the seed/share text.</p>
+                      </>
+                    ) : (
+                      <p className="field__hint">Switch to the Custom preset to tune tiles, lengths, alphabet theme, and ladder runs.</p>
+                    )}
                   </div>
 
                   <div className="panel-section setup-col">
@@ -1068,9 +1063,6 @@ function App() {
                   <button className="ghost" onClick={onResetStats}>
                     Reset
                   </button>
-                  <button className="start-button" onClick={handleStart} disabled={!puzzle}>
-                    Start Game
-                  </button>
                   {ladder && (
                     <div className="ladder-nav">
                       <button onClick={() => moveToLadderLevel(ladder.index - 1)} disabled={ladder.index === 0}>
@@ -1104,7 +1096,7 @@ function App() {
           <section className="board" ref={boardRef}>
             {isMobile && (
               <div className="mobile-actions-inline" role="region" aria-label="Puzzle actions">
-                <button className="ghost" onClick={handleGenerate}>
+                <button className="ghost" onClick={() => handleGenerate({ ignoreSeed: true })}>
                   Regenerate
                 </button>
                 <button className="ghost" onClick={onClearSolution} disabled={!puzzle}>
