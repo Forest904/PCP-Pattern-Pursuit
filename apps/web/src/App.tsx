@@ -28,8 +28,6 @@ type KnobState = {
   theme: AlphabetTheme;
 };
 
-type PresetChoice = PresetName | "";
-
 const formatTime = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60)
@@ -193,7 +191,7 @@ const knobsToOverrides = (value: KnobState) => ({
 
 const resolvePresetAndKnobs = (
   parsed: ReturnType<typeof parseSeedPayload>,
-  currentPreset: PresetChoice,
+  currentPreset: PresetName | undefined,
   currentKnobs: KnobState,
 ): { preset: PresetName; knobs: KnobState } => {
   const effectivePreset = parsed.preset ?? currentPreset ?? "easy";
@@ -208,7 +206,7 @@ const resolvePresetAndKnobs = (
 };
 
 function App() {
-  const [preset, setPreset] = useState<PresetChoice>("");
+  const [preset, setPreset] = useState<PresetName | undefined>(undefined);
   const [knobs, setKnobs] = useState<KnobState>(() => presetDefaults["easy"]);
   const [ladderLevels, setLadderLevels] = useState(3);
   const [ladder, setLadder] = useState<{ baseSeed: string; puzzles: PuzzleInstance[]; index: number } | null>(null);
@@ -723,11 +721,11 @@ function App() {
               <label className="field">
                 <span>Mode</span>
                 <select
-                  value={preset}
+                  value={preset ?? ""}
                   onChange={(e) => {
-                    const value = e.target.value as PresetChoice;
+                    const value = e.target.value as PresetName | "";
                     if (!value) {
-                      setPreset("");
+                      setPreset(undefined);
                       setPuzzle(null);
                       setSeedInput("");
                       return;
@@ -761,11 +759,11 @@ function App() {
                 <label className="field">
                   <span>Preset</span>
                   <select
-                    value={preset}
+                    value={preset ?? ""}
                     onChange={(e) => {
-                      const value = e.target.value as PresetChoice;
+                      const value = e.target.value as PresetName | "";
                       if (!value) {
-                        setPreset("");
+                        setPreset(undefined);
                         setPuzzle(null);
                         setSeedInput("");
                         return;
