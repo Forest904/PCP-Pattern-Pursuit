@@ -196,7 +196,7 @@ const resolvePresetAndKnobs = (
   currentPreset: PresetChoice,
   currentKnobs: KnobState,
 ): { preset: PresetName; knobs: KnobState } => {
-  const effectivePreset = parsed.preset ?? currentPreset || "easy";
+  const effectivePreset = parsed.preset ?? currentPreset ?? "easy";
   const baseKnobs = presetDefaults[effectivePreset];
   const allowCurrent = effectivePreset === currentPreset;
   const mergedKnobs = normalizeKnobs({
