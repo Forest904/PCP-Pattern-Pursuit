@@ -28,6 +28,8 @@ type KnobState = {
   theme: AlphabetTheme;
 };
 
+type PresetChoice = PresetName | "";
+
 const formatTime = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60)
@@ -191,10 +193,10 @@ const knobsToOverrides = (value: KnobState) => ({
 
 const resolvePresetAndKnobs = (
   parsed: ReturnType<typeof parseSeedPayload>,
-  currentPreset: PresetName,
+  currentPreset: PresetChoice,
   currentKnobs: KnobState,
 ): { preset: PresetName; knobs: KnobState } => {
-  const effectivePreset = parsed.preset ?? currentPreset;
+  const effectivePreset = parsed.preset ?? currentPreset || "easy";
   const baseKnobs = presetDefaults[effectivePreset];
   const allowCurrent = effectivePreset === currentPreset;
   const mergedKnobs = normalizeKnobs({
@@ -206,7 +208,7 @@ const resolvePresetAndKnobs = (
 };
 
 function App() {
-  const [preset, setPreset] = useState<PresetName>("easy");
+  const [preset, setPreset] = useState<PresetChoice>("");
   const [knobs, setKnobs] = useState<KnobState>(() => presetDefaults["easy"]);
   const [ladderLevels, setLadderLevels] = useState(3);
   const [ladder, setLadder] = useState<{ baseSeed: string; puzzles: PuzzleInstance[]; index: number } | null>(null);
@@ -301,7 +303,7 @@ function App() {
     setMessage(getPuzzleMessage(nextPuzzle));
     if (isMobile) {
       setMobileStage("play");
-      setMobileActionsMinimized(false);
+      setMobileActionsMinimized(true);
     }
   };
 
@@ -334,7 +336,7 @@ function App() {
     resetProgress();
     if (isMobile) {
       setMobileStage("play");
-      setMobileActionsMinimized(false);
+      setMobileActionsMinimized(true);
     }
     setMessage(getPuzzleMessage(next));
     setSeedInput(formatSeedPayload(next.seed, effectivePreset, appliedKnobs));
@@ -395,7 +397,7 @@ function App() {
     resetProgress();
     if (isMobile) {
       setMobileStage("play");
-      setMobileActionsMinimized(false);
+      setMobileActionsMinimized(true);
     }
     setMessage(
       !firstPuzzle.solvable
@@ -619,6 +621,7 @@ function App() {
   const solutionCapacity = puzzle ? puzzle.settings.tileCount : knobs.tileCount;
   const showShell = !isMobile || mobileStage === "setup";
   const showBoard = puzzle && (!isMobile || mobileStage === "play");
+  const presetLabel = preset ? presetLabels[preset] : "Select mode";
 
   return (
     <div className="app">
@@ -662,7 +665,7 @@ function App() {
             <div className="hud-grid">
               <div className="hud-card">
                 <span>Mode</span>
-                <strong>{presetLabels[preset]}</strong>
+                <strong>{presetLabel}</strong>
               </div>
               <div className="hud-card">
                 <span>Tiles</span>
@@ -721,8 +724,20 @@ function App() {
                 <span>Mode</span>
                 <select
                   value={preset}
-                  onChange={(e) => handlePresetChange(e.target.value as PresetName)}
+                  onChange={(e) => {
+                    const value = e.target.value as PresetChoice;
+                    if (!value) {
+                      setPreset("");
+                      setPuzzle(null);
+                      setSeedInput("");
+                      return;
+                    }
+                    handlePresetChange(value as PresetName);
+                  }}
                 >
+                  <option value="">
+                    Select mode
+                  </option>
                   {Object.entries(presetLabels).map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
@@ -747,13 +762,25 @@ function App() {
                   <span>Preset</span>
                   <select
                     value={preset}
-                    onChange={(e) => handlePresetChange(e.target.value as PresetName)}
+                    onChange={(e) => {
+                      const value = e.target.value as PresetChoice;
+                      if (!value) {
+                        setPreset("");
+                        setPuzzle(null);
+                        setSeedInput("");
+                        return;
+                      }
+                      handlePresetChange(value as PresetName);
+                    }}
                   >
-                      {Object.entries(presetLabels).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
+                    <option value="">
+                      Select mode
+                    </option>
+                    {Object.entries(presetLabels).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
                     </select>
                   </label>
                   <label className="field seed-field">
@@ -920,7 +947,7 @@ function App() {
                     <h3>Statistics</h3>
                     <div className="stat-row">
                       <span>Mode</span>
-                      <strong>{presetLabels[preset]}</strong>
+                      <strong>{presetLabel}</strong>
                     </div>
                     <div className="stat-row">
                       <span>Tiles</span>
