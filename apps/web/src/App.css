@@ -745,6 +745,91 @@ button.start-button {
   font-size: 1.4rem;
   display: inline-block;
 }
+
+.confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 30;
+}
+
+.confetti__piece {
+  position: absolute;
+  top: -10%;
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation: confetti-fall 1.2s ease-out forwards;
+}
+
+.confetti__piece--1 {
+  background: #7ce0ff;
+}
+
+.confetti__piece--2 {
+  background: #5af0b1;
+}
+
+.confetti__piece--3 {
+  background: #ffd166;
+}
+
+.confetti__piece--4 {
+  background: #ff9ab2;
+}
+
+.confetti__piece:nth-child(odd) {
+  width: 7px;
+  height: 16px;
+}
+
+.confetti__piece:nth-child(3n) {
+  animation-duration: 1.35s;
+}
+
+.confetti__piece:nth-child(4n) {
+  animation-duration: 1.5s;
+}
+
+.confetti__piece:nth-child(5n) {
+  animation-duration: 1.25s;
+}
+
+.confetti__piece:nth-child(1) { left: 5%; animation-delay: 0s; }
+.confetti__piece:nth-child(2) { left: 12%; animation-delay: 0.05s; }
+.confetti__piece:nth-child(3) { left: 20%; animation-delay: 0.1s; }
+.confetti__piece:nth-child(4) { left: 28%; animation-delay: 0.12s; }
+.confetti__piece:nth-child(5) { left: 36%; animation-delay: 0.08s; }
+.confetti__piece:nth-child(6) { left: 44%; animation-delay: 0.02s; }
+.confetti__piece:nth-child(7) { left: 52%; animation-delay: 0.14s; }
+.confetti__piece:nth-child(8) { left: 60%; animation-delay: 0.04s; }
+.confetti__piece:nth-child(9) { left: 68%; animation-delay: 0.09s; }
+.confetti__piece:nth-child(10) { left: 76%; animation-delay: 0.06s; }
+.confetti__piece:nth-child(11) { left: 84%; animation-delay: 0.11s; }
+.confetti__piece:nth-child(12) { left: 92%; animation-delay: 0.03s; }
+.confetti__piece:nth-child(13) { left: 16%; animation-delay: 0.07s; }
+.confetti__piece:nth-child(14) { left: 48%; animation-delay: 0.05s; }
+.confetti__piece:nth-child(15) { left: 72%; animation-delay: 0.13s; }
+.confetti__piece:nth-child(16) { left: 32%; animation-delay: 0.09s; }
+.confetti__piece:nth-child(17) { left: 56%; animation-delay: 0.01s; }
+.confetti__piece:nth-child(18) { left: 88%; animation-delay: 0.15s; }
+
+@keyframes confetti-fall {
+  0% {
+    transform: translate3d(0, -10%, 0) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: translate3d(-4px, 55vh, 0) rotate(160deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(6px, 110vh, 0) rotate(300deg);
+    opacity: 0;
+  }
+}
 .rules {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(124, 224, 255, 0.18);

@@ -227,7 +227,9 @@ function App() {
   const [mobileActionsHidden, setMobileActionsHidden] = useState(false);
   const [mobileStage, setMobileStage] = useState<"setup" | "play">("setup");
   const [mobileActionsMinimized, setMobileActionsMinimized] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const boardRef = useRef<HTMLElement | null>(null);
+  const winTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (status !== "playing" || startTime === null) return;
@@ -276,11 +278,33 @@ function App() {
     return () => observer.disconnect();
   }, [isMobile]);
 
+  useEffect(() => {
+    return () => {
+      if (winTimeoutRef.current) {
+        window.clearTimeout(winTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const getPuzzleMessage = (next: PuzzleInstance) => {
     if (!next.solvable) return "This seed is unsolvable.";
     if (next.settings.allowUnsolvable) return "Press Start or drop a tile - this seed might be unsolvable.";
     if (next.settings.forceUnique) return "Start or drop a tile to play.";
     return "Start or drop a tile - multiple solutions may exist.";
+  };
+
+  const triggerWinCelebration = () => {
+    if (winTimeoutRef.current) {
+      window.clearTimeout(winTimeoutRef.current);
+    }
+    setShowConfetti(true);
+    const id = window.setTimeout(() => {
+      setShowConfetti(false);
+      if (isMobile) {
+        setMobileStage("setup");
+      }
+    }, 1500);
+    winTimeoutRef.current = id;
   };
 
   const handlePresetChange = (nextPreset: PresetName) => {
@@ -306,6 +330,11 @@ function App() {
   };
 
   const resetProgress = () => {
+    if (winTimeoutRef.current) {
+      window.clearTimeout(winTimeoutRef.current);
+      winTimeoutRef.current = null;
+    }
+    setShowConfetti(false);
     setSlots([]);
     setStatus("idle");
     setMoves(0);
@@ -332,6 +361,7 @@ function App() {
     setPuzzle(next);
     setLadder(null);
     resetProgress();
+    setShowConfetti(false);
     if (isMobile) {
       setMobileStage("play");
       setMobileActionsMinimized(true);
@@ -393,6 +423,7 @@ function App() {
     setKnobs(settingsToKnobs(firstPuzzle.settings));
     setPuzzle(firstPuzzle);
     resetProgress();
+    setShowConfetti(false);
     if (isMobile) {
       setMobileStage("play");
       setMobileActionsMinimized(true);
@@ -439,9 +470,7 @@ function App() {
       setStatus("solved");
       setMessage("Matched!");
       setStartTime(null);
-      if (isMobile) {
-        setMobileStage("setup");
-      }
+      triggerWinCelebration();
     }
   };
 
@@ -533,9 +562,7 @@ function App() {
       setSlots(solution.slice(0, puzzle.settings.tileCount));
       setStatus("solved");
       setMessage("Solution revealed.");
-      if (isMobile) {
-        setMobileStage("setup");
-      }
+      triggerWinCelebration();
     } else {
       setStatus("unsolved");
       setMessage("This instance is unsolvable.");
@@ -634,6 +661,13 @@ function App() {
 
   return (
     <div className="app">
+      {showConfetti && (
+        <div className="confetti" aria-hidden="true">
+          {Array.from({ length: 18 }).map((_, idx) => (
+            <span key={idx} className={`confetti__piece confetti__piece--${(idx % 4) + 1}`} />
+          ))}
+        </div>
+      )}
       {showShell && (
         <>
           <header className="site-header">
