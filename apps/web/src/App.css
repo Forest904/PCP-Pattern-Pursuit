@@ -681,6 +681,12 @@ button.start-button {
   color: var(--ink);
 }
 
+.hint--placement {
+  margin: 0;
+  color: #9ee8ff;
+  font-weight: 700;
+}
+
 .badge {
   padding: 0.35rem 0.6rem;
   border-radius: 10px;
@@ -915,7 +921,8 @@ button.start-button {
   padding: 0.5rem;
   color: var(--muted);
   background: transparent;
-  opacity: 0.12;
+  opacity: 0;
+  pointer-events: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, opacity 0.15s ease;
 }
 
@@ -939,6 +946,7 @@ button.start-button {
 .solution--selecting .solution__dropzone,
 .solution__dropzone--active {
   opacity: 0.5;
+  pointer-events: auto;
   border-color: rgba(90, 240, 177, 0.6);
   background: rgba(90, 240, 177, 0.08);
   box-shadow: 0 8px 30px rgba(90, 240, 177, 0.12);
@@ -1107,7 +1115,7 @@ button.start-button {
     min-width: clamp(48px, 18vw, 120px);
     flex: 1 1 clamp(48px, 18vw, 120px);
     min-height: clamp(110px, 30vw, 170px);
-    opacity: 0.08;
+    opacity: 0;
   }
 
   .solution__dropzone--solo {

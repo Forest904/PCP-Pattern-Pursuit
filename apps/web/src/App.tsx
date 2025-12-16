@@ -643,6 +643,7 @@ function App() {
   const showShell = !isMobile || mobileStage === "setup";
   const showBoard = puzzle && (!isMobile || mobileStage === "play");
   const presetLabel = preset ? presetLabels[preset] : "Select mode";
+  const showFirstDropHint = puzzle && slots.length === 0 && status !== "solved";
   const slotCount = puzzle ? Math.max(slots.length || 1, puzzle.settings.tileCount) : Math.max(1, slots.length || 1);
   const slotVars: CSSProperties = {
     ["--slot-count" as string]: slotCount,
@@ -1111,6 +1112,7 @@ function App() {
                 <div className="solution__header">
                   <h3>Solution</h3>
                   <p className="hint">Drag or tap tiles to place; tap between tiles to insert or reorder.</p>
+                  {showFirstDropHint && <p className="hint hint--placement">Select a tile, then tap left or right to place it.</p>}
                   <div className="message-inline">
                     {status === "solved" ? (
                       <div className="victory-banner">
