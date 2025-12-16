@@ -1104,9 +1104,6 @@ function App() {
           <section className="board" ref={boardRef}>
             {isMobile && (
               <div className="mobile-actions-inline" role="region" aria-label="Puzzle actions">
-                <button className="primary" onClick={handleStart} disabled={!puzzle}>
-                  Start
-                </button>
                 <button className="ghost" onClick={handleGenerate}>
                   Regenerate
                 </button>
@@ -1114,7 +1111,7 @@ function App() {
                   Clear row
                 </button>
                 <button className="ghost" onClick={onShowSolution} disabled={!puzzle}>
-                  Show
+                  Show solution
                 </button>
                 <button className="ghost warn" onClick={onGiveUp}>
                   Give up
