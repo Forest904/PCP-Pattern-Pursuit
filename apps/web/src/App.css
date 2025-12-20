@@ -622,9 +622,7 @@ body {
 }
 
 .slot__label {
-  font-weight: 700;
-  color: var(--ink);
-  font-family: "IBM Plex Mono", monospace;
+  display: none;
 }
 
 .slot__empty {
