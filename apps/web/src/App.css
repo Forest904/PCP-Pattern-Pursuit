@@ -496,7 +496,7 @@ body {
 .tile-card,
 .solution__slot,
 .solution__dropzone {
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
 }
 
 .tile-card:hover {
